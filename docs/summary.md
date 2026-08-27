@@ -1,0 +1,4 @@
+- [Home](index.md)
+- [Criteria for Project Selection](criteria-for-project-selection.md)
+- Journals
+  - [journals/](journals/)

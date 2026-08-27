@@ -1,0 +1,84 @@
+site_name: "UCS503 : Software Engineering : SkillGrid"
+site_url: https://yvishi.github.io/UCS503P-202627-SkillGrid-Project
+
+plugins:
+- search
+- literate-nav:
+    nav_file: summary.md
+- section-index
+- git-revision-date-localized
+- git-authors
+
+theme:
+  name: material
+  custom_dir: docs/assets/theme-overrides
+  features:
+    - navigation.footer
+    - header.autohide
+    - content.tabs.link
+    - navigation.tracking
+    - navigation.top
+    - toc.integrate
+    - content.tooltips
+  icon:
+    repo: fontawesome/brands/github
+    annotation: material/plus-circle-outline
+  palette:
+    primary: indigo
+    accent: amber
+  favicon: assets/favicon.png
+
+repo_url: https://github.com/yvishi/UCS503P-202627-SkillGrid-Project
+repo_name: UCS503P-202627-SkillGrid-Project
+copyright: "Copyright &copy; 2026 SkillGrid Team"
+extra:
+  social:
+  - icon: fontawesome/brands/github
+    link: https://github.com/yvishi/UCS503P-202627-SkillGrid-Project
+    name: Git Repo for SkillGrid
+
+extra_css:
+  - assets/stylesheets/extra.css
+  - https://unpkg.com/katex@0/dist/katex.min.css
+
+extra_javascript:
+- https://unpkg.com/katex@0/dist/katex.min.js
+- javascript/arithmatex.js
+
+markdown_extensions:
+  - abbr
+  - md_in_html
+  - attr_list
+  - toc:
+      permalink: true
+  - footnotes
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite:
+      custom_inline:
+        - name: math
+          class: arithmatex
+          format: !!python/object/apply:pymdownx.arithmatex.arithmatex_inline_format {which: generic}
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: math
+          class: arithmatex
+          arithmatex: !!python/object/apply:pymdownx.arithmatex.arithmatex_fenced_format {which: generic}
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.critic
+  - pymdownx.caret
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tilde
+  - toc:
+      toc_depth: 4
+  - sane_lists

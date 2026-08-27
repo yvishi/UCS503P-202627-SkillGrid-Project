@@ -1,0 +1,53 @@
+name: Deploy Frontend to Vercel
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "code/frontend/**"
+      - ".github/workflows/vercel-deploy.yml"
+  pull_request:
+    paths:
+      - "code/frontend/**"
+      - ".github/workflows/vercel-deploy.yml"
+
+defaults:
+  run:
+    working-directory: code/frontend
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: >
+          vercel pull --yes
+          --environment=${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+          --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build project artifacts
+        run: >
+          vercel build
+          ${{ github.event_name != 'pull_request' && '--prod' || '' }}
+          --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: >
+          vercel deploy --prebuilt
+          ${{ github.event_name != 'pull_request' && '--prod' || '' }}
+          --token=${{ secrets.VERCEL_TOKEN }}

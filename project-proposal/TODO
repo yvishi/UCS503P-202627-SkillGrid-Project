@@ -1,0 +1,18 @@
+TODO: write project-proposal/main.tex (LaTeX) for
+SkillGrid, following the structure of the course
+template's sample proposal:
+
+- Higher-order goal
+- Time-to-value
+- Problem Statement
+- Proposed Solution
+- Solution Approach
+- Evaluation Criterion
+- Scalability
+- Engine availability heuristic
+- Project scope and deliverables
+- Risks and mitigations
+- Summary
+
+See:
+https://github.com/tiet-ucs503/ucs503p-202627odd-template/blob/master/project-proposal/main.tex

@@ -1,0 +1,33 @@
+
+[build-system]
+requires = ["hatchling","hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yvishi.github.io/UCS503P-202627-SkillGrid-Project"
+version = "0.0.1"
+authors = [
+  { name="SkillGrid Team" },
+]
+description = "UCS503 : Software Engineering : SkillGrid"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/yvishi/UCS503P-202627-SkillGrid-Project"
+
+# Adapted from https://stackoverflow.com/a/50156706
+[tool.pytest.ini_options]
+pythonpath = [
+  "code"
+]
+# THE END -------------------------------------------
