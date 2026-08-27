@@ -1,0 +1,170 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+}
+
+\title{\bfseries Week 1: Project Scaffolding, Frontend
+  Setup \& Vercel CI/CD}
+\author{Yash \\ \small Roll No: 1024030846}
+\date{27 August 2026}
+
+\begin{document}
+\maketitle
+
+\section{Context}
+Start of the SkillGrid project. The GitHub repository
+existed but was empty. Today's work was to bring the
+repository up to the structure required by the UCS503P
+course template, and to get a first, real, automatically
+deployed increment of the frontend working -- in line
+with the course's emphasis on rapid, CI/CD-backed
+iterations.
+
+\section{Repository Structure}
+Cloned the reference course template
+(\texttt{tiet-ucs503/ucs503p-202627odd-template}) to
+study its layout, then replicated the same structure in
+the SkillGrid repository:
+
+\begin{itemize}[leftmargin=0.7cm]
+  \item \texttt{docs/} -- MkDocs-based documentation site.
+  \item \texttt{journals/} -- one folder per team member
+    (this file lives under \texttt{journals/1024030846-yash/}).
+  \item \texttt{project-proposal/},
+    \texttt{project-report-prototype-stage/},
+    \texttt{project-report-final/} -- LaTeX report folders.
+  \item \texttt{code/} -- source code root.
+  \item \texttt{assets/}, \texttt{mkdocs.yml},
+    \texttt{.github/workflows/mkdocs.yml} -- documentation
+    build and GitHub Pages deployment.
+\end{itemize}
+
+\subsection{Issue: Symlinks on Windows}
+The template links \texttt{docs/assets} and
+\texttt{docs/journals} to the root-level
+\texttt{assets/} and \texttt{journals/} folders via
+symlinks, so MkDocs can serve them without duplicating
+content.
+
+\textbf{Problem:} creating these with \texttt{ln -s} on
+Windows (without Developer Mode/admin privilege) silently
+created real directories instead of symlinks, which then
+got fully duplicated into the git index as separate
+binary files.
+
+\textbf{Fix:} removed the duplicated directories and used
+git's plumbing commands directly to record proper symlink
+blob entries (git file mode \texttt{120000}):
+
+\begin{lstlisting}[language=bash]
+printf '../assets' | git hash-object -w --stdin
+git update-index --add --cacheinfo 120000,<sha>,docs/assets
+\end{lstlisting}
+
+This checks out as an inert placeholder file on Windows
+(no symlink support), but resolves as a real symlink on
+the Ubuntu-based GitHub Actions runner, which is where the
+MkDocs build actually happens.
+
+\section{Frontend Scaffold}
+Since \texttt{code/} was empty, scaffolded a minimal
+Next.js application (TypeScript, ESLint, Tailwind CSS,
+App Router) under \texttt{code/frontend/}, so that the
+deployment pipeline would have something real to build and
+verify end-to-end, rather than wiring up CI/CD against
+nothing.
+
+Verified locally before wiring up any automation:
+\begin{lstlisting}[language=bash]
+npm install
+npm run build
+\end{lstlisting}
+Both succeeded, confirming the scaffold was a valid
+starting point.
+
+\section{CI/CD Pipeline: Vercel Deployment}
+Added \texttt{.github/workflows/vercel-deploy.yml}: a
+GitHub Actions workflow that deploys \texttt{code/frontend}
+to Vercel using the official Vercel CLI flow
+(\texttt{vercel pull} $\to$ \texttt{vercel build} $\to$
+\texttt{vercel deploy --prebuilt}), triggered on pushes to
+\texttt{main} (production) and on pull requests (preview),
+scoped to only run when \texttt{code/frontend/**} changes.
+
+\subsection{Secrets}
+The workflow needs three GitHub Actions secrets:
+\texttt{VERCEL\_TOKEN}, \texttt{VERCEL\_ORG\_ID}, and
+\texttt{VERCEL\_PROJECT\_ID}. Noted that Vercel tokens are
+scoped to an account/team, not to an individual project --
+the actual per-project targeting comes from
+\texttt{VERCEL\_PROJECT\_ID}, so the same token can be
+reused for a backend project added later.
+
+Confirmed via \texttt{gh secret list} that all three secrets
+were present on the repository before the first CI run.
+
+\subsection{Debugging: Duplicated Root Directory Path}
+\textbf{Error encountered on first real deploy run:}
+\begin{lstlisting}
+Error: ENOENT: no such file or directory, open
+'.../code/frontend/code/frontend/package.json'
+\end{lstlisting}
+
+\textbf{Relevant context:} the Vercel project's own
+\emph{Root Directory} setting (configured when the project
+was imported on vercel.com) was \texttt{code/frontend}.
+The workflow \emph{also} set
+\texttt{defaults.run.working-directory: code/frontend}
+before invoking the Vercel CLI.
+
+\textbf{Key observation:} \texttt{vercel build} applies the
+pulled project's Root Directory setting \emph{relative to
+the current working directory}. Since the workflow had
+already \texttt{cd}'d into \texttt{code/frontend}, Vercel
+appended the same subpath again, producing
+\texttt{code/frontend/code/frontend}.
+
+\textbf{Solution:} removed the
+\texttt{working-directory: code/frontend} default from the
+workflow, so all Vercel CLI steps run from the repository
+root and the project's own Root Directory setting is the
+single source of truth:
+\begin{lstlisting}[language=diff]
+- defaults:
+-   run:
+-     working-directory: code/frontend
+\end{lstlisting}
+
+\emph{Because} the two mechanisms (shell working directory
+and CLI-applied project setting) are not aware of each
+other and are not idempotent when composed -- only one of
+them should determine the subdirectory.
+
+\section{Outcome}
+After the fix, the workflow ran green end-to-end (install
+$\to$ pull $\to$ build $\to$ deploy) and the frontend went
+live at:
+\begin{center}
+  \url{https://skillgrid-frontend-coral.vercel.app}
+\end{center}
+
+\section{Follow-ups}
+\begin{itemize}[leftmargin=0.7cm]
+  \item \texttt{mkdocs} GitHub Pages workflow also failed
+    on its first run and needs a separate look.
+  \item \texttt{project-proposal/main.tex} for SkillGrid
+    itself is still a TODO.
+  \item Backend architecture and its own Vercel/CI setup
+    not yet decided.
+\end{itemize}
+
+\end{document}
