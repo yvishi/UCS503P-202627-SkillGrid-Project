@@ -22,16 +22,38 @@ const fieldClass =
 const submitClass =
   "rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900";
 
+const ALLOWED_RESUME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+const MAX_RESUME_BYTES = 5 * 1024 * 1024;
+
 export function OnboardingForm() {
   const [path, setPath] = useState<Path>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [stateA, formActionA] = useActionState(completeOnboardingPathA, null);
   const [stateB, formActionB] = useActionState(completeOnboardingPathB, null);
+  const [clientFileError, setClientFileError] = useState<string | null>(null);
 
   function toggleTag(tag: string) {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
+  }
+
+  function handleResumeChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setClientFileError(null);
+      return;
+    }
+    if (file.size > MAX_RESUME_BYTES) {
+      setClientFileError("Resume must be 5MB or smaller.");
+    } else if (!ALLOWED_RESUME_TYPES.includes(file.type)) {
+      setClientFileError("Resume must be a PDF or DOCX file.");
+    } else {
+      setClientFileError(null);
+    }
   }
 
   return (
@@ -83,6 +105,7 @@ export function OnboardingForm() {
               type="file"
               accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               required
+              onChange={handleResumeChange}
               className="mt-1 block w-full text-sm"
             />
           </div>
@@ -94,6 +117,11 @@ export function OnboardingForm() {
           >
             Connect GitHub (coming soon)
           </button>
+          {clientFileError && (
+            <p className="text-sm text-red-600 dark:text-red-400">
+              {clientFileError}
+            </p>
+          )}
           {stateA?.error && (
             <p className="text-sm text-red-600 dark:text-red-400">
               {stateA.error}

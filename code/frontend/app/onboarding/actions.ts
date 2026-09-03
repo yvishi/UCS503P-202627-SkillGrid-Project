@@ -47,22 +47,30 @@ export async function completeOnboardingPathA(
     return { error: "Resume must be a PDF or DOCX file." };
   }
 
-  const fileUrl = await uploadResume(userId, file);
+  let fileUrl: string;
+  try {
+    fileUrl = await uploadResume(userId, file);
 
-  await prisma.$transaction([
-    prisma.evidenceRecord.create({
-      data: {
-        userId,
-        source: "RESUME",
-        payload: { fileUrl, status: "pending_parse" },
-      },
-    }),
-    prisma.profile.upsert({
-      where: { userId },
-      create: { userId, onboardingCompletedAt: new Date() },
-      update: { onboardingCompletedAt: new Date() },
-    }),
-  ]);
+    await prisma.$transaction([
+      prisma.evidenceRecord.create({
+        data: {
+          userId,
+          source: "RESUME",
+          payload: { fileUrl, status: "pending_parse" },
+        },
+      }),
+      prisma.profile.upsert({
+        where: { userId },
+        create: { userId, onboardingCompletedAt: new Date() },
+        update: { onboardingCompletedAt: new Date() },
+      }),
+    ]);
+  } catch (err) {
+    console.error("completeOnboardingPathA failed:", err);
+    return {
+      error: "Something went wrong uploading your resume. Please try again.",
+    };
+  }
 
   redirect("/");
 }
@@ -117,24 +125,31 @@ export async function completeOnboardingPathB(
     }
   }
 
-  await prisma.profile.upsert({
-    where: { userId },
-    create: {
-      userId,
-      comfortLevel,
-      availability,
-      interestTags,
-      projectLinks,
-      onboardingCompletedAt: new Date(),
-    },
-    update: {
-      comfortLevel,
-      availability,
-      interestTags,
-      projectLinks,
-      onboardingCompletedAt: new Date(),
-    },
-  });
+  try {
+    await prisma.profile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        comfortLevel,
+        availability,
+        interestTags,
+        projectLinks,
+        onboardingCompletedAt: new Date(),
+      },
+      update: {
+        comfortLevel,
+        availability,
+        interestTags,
+        projectLinks,
+        onboardingCompletedAt: new Date(),
+      },
+    });
+  } catch (err) {
+    console.error("completeOnboardingPathB failed:", err);
+    return {
+      error: "Something went wrong saving your profile. Please try again.",
+    };
+  }
 
   redirect("/");
 }
