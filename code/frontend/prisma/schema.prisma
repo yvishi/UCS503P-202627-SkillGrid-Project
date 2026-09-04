@@ -81,12 +81,31 @@ model Profile {
   githubUsername String?
   bio            String?
 
+  onboardingCompletedAt DateTime?
+  comfortLevel          ComfortLevel?
+  interestTags          String[]      @default([])
+  availability          Availability?
+  projectLinks          String[]      @default([])
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("profiles")
+}
+
+enum ComfortLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum Availability {
+  WEEKDAYS
+  WEEKENDS
+  BOTH
+  FLEXIBLE
 }
 
 enum EvidenceSource {
