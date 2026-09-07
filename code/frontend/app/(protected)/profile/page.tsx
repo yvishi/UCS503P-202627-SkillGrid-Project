@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
+import { Avatar } from "./Avatar";
+
 export const metadata: Metadata = {
   title: "SkillGrid – Profile",
 };
@@ -23,19 +25,6 @@ const AVAILABILITY_LABEL: Record<string, string> = {
   BOTH: "Weekdays & Weekends",
   FLEXIBLE: "Flexible",
 };
-
-function Initials({ name }: { name: string }) {
-  const parts = name.trim().split(" ");
-  const letters =
-    parts.length >= 2
-      ? parts[0][0] + parts[parts.length - 1][0]
-      : parts[0].slice(0, 2);
-  return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-neutral-300 bg-neutral-100 text-lg font-semibold text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
-      {letters.toUpperCase()}
-    </div>
-  );
-}
 
 function SectionCard({
   title,
@@ -126,12 +115,7 @@ export default async function ProfilePage() {
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-5">
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt={name} className="h-16 w-16 rounded-full" />
-        ) : (
-          <Initials name={name} />
-        )}
+        <Avatar name={name} image={image} />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
           {email && (
