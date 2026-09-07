@@ -1,76 +1,23 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Profile",
 };
 
 // ---------------------------------------------------------------------------
-// Types — mirror the Prisma enums exactly so the swap to real data is trivial.
+// Display helpers — labels are keyed off the Prisma enums (see schema.prisma).
 // ---------------------------------------------------------------------------
-type ComfortLevel = "BEGINNER" | "INTERMEDIATE" | "ADVANCED";
-type Availability = "WEEKDAYS" | "WEEKENDS" | "BOTH" | "FLEXIBLE";
-
-type ProfileData = {
-  name: string;
-  email: string;
-  image: string | null;
-  githubUsername: string | null;
-  bio: string | null;
-  // Path B fields — null/empty for users who chose Path A (resume upload).
-  comfortLevel: ComfortLevel | null;
-  interestTags: string[];
-  availability: Availability | null;
-  projectLinks: string[];
-  // Evidence
-  resumeUploaded: boolean;
-};
-
-// ---------------------------------------------------------------------------
-// Fake data — two variants, one per onboarding path.
-// Visit /profile?path=B to see the Path B layout.
-// Replace both with a real prisma.profile.findUnique() call once auth is
-// wired up and this page moves inside app/(protected)/.
-// ---------------------------------------------------------------------------
-const FAKE_PATH_A: ProfileData = {
-  name: "Alex Johnson",
-  email: "alex.johnson@thapar.edu",
-  image: null,
-  githubUsername: null,
-  bio: null,
-  // Path B fields are null/empty — this user uploaded a resume instead.
-  comfortLevel: null,
-  interestTags: [],
-  availability: null,
-  projectLinks: [],
-  resumeUploaded: true,
-};
-
-const FAKE_PATH_B: ProfileData = {
-  name: "Priya Sharma",
-  email: "priya.sharma@thapar.edu",
-  image: null,
-  githubUsername: "priyasharma",
-  bio: "CS sophomore at TIET. Interested in backend systems and cloud infra.",
-  comfortLevel: "INTERMEDIATE",
-  interestTags: ["Backend", "Cloud", "DevOps", "Web Dev"],
-  availability: "WEEKENDS",
-  projectLinks: [
-    "https://github.com/priyasharma/weather-api",
-    "https://github.com/priyasharma/notes-app",
-  ],
-  resumeUploaded: false,
-};
-
-// ---------------------------------------------------------------------------
-// Display helpers
-// ---------------------------------------------------------------------------
-const COMFORT_LABEL: Record<ComfortLevel, string> = {
+const COMFORT_LABEL: Record<string, string> = {
   BEGINNER: "Beginner",
   INTERMEDIATE: "Intermediate",
   ADVANCED: "Advanced",
 };
 
-const AVAILABILITY_LABEL: Record<Availability, string> = {
+const AVAILABILITY_LABEL: Record<string, string> = {
   WEEKDAYS: "Weekdays",
   WEEKENDS: "Weekends",
   BOTH: "Weekdays & Weekends",
@@ -121,41 +68,82 @@ function Empty({ message }: { message: string }) {
   );
 }
 
+function EvidenceRow({ done, children }: { done: boolean; children: React.ReactNode }) {
+  return (
+    <li
+      className={
+        done
+          ? "flex items-center gap-2 text-sm"
+          : "flex items-center gap-2 text-sm text-neutral-400 dark:text-neutral-600"
+      }
+    >
+      <span
+        className={
+          done
+            ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[10px] font-bold text-white dark:bg-white dark:text-neutral-900"
+            : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] dark:border-neutral-700"
+        }
+      >
+        {done ? "✓" : "–"}
+      </span>
+      {children}
+    </li>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
-export default async function ProfilePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ path?: string }>;
-}) {
-  const { path } = await searchParams;
-  const user: ProfileData = path === "B" ? FAKE_PATH_B : FAKE_PATH_A;
+export default async function ProfilePage() {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) {
+    redirect("/");
+  }
+
+  const [profile, evidence] = await Promise.all([
+    prisma.profile.findUnique({ where: { userId } }),
+    prisma.evidenceRecord.findMany({
+      where: { userId },
+      select: { source: true },
+    }),
+  ]);
+
+  // The protected layout already redirects users without a completed profile
+  // to onboarding; this guards the direct-navigation edge case.
+  if (!profile?.onboardingCompletedAt) {
+    redirect("/onboarding");
+  }
+
+  const name = session.user?.name ?? session.user?.email ?? "Your profile";
+  const email = session.user?.email ?? "";
+  const image = session.user?.image ?? null;
+
+  const resumeUploaded = evidence.some((e) => e.source === "RESUME");
+  const githubConnected = evidence.some((e) => e.source === "GITHUB");
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-5">
-        {user.image ? (
+        {image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.image}
-            alt={user.name}
-            className="h-16 w-16 rounded-full"
-          />
+          <img src={image} alt={name} className="h-16 w-16 rounded-full" />
         ) : (
-          <Initials name={user.name} />
+          <Initials name={name} />
         )}
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{user.name}</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
-            {user.email}
-          </p>
-          {user.githubUsername && (
+          <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
+          {email && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              {email}
+            </p>
+          )}
+          {profile.githubUsername && (
             <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
               GitHub:{" "}
               <span className="font-medium text-neutral-700 dark:text-neutral-300">
-                @{user.githubUsername}
+                @{profile.githubUsername}
               </span>
             </p>
           )}
@@ -163,25 +151,27 @@ export default async function ProfilePage({
       </div>
 
       {/* ── Bio ────────────────────────────────────────────────── */}
-      {user.bio && (
+      {profile.bio && (
         <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          {user.bio}
+          {profile.bio}
         </p>
       )}
 
       {/* ── Comfort level + availability ───────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <SectionCard title="Comfort Level">
-          {user.comfortLevel ? (
-            <Pill>{COMFORT_LABEL[user.comfortLevel]}</Pill>
+          {profile.comfortLevel ? (
+            <Pill>{COMFORT_LABEL[profile.comfortLevel] ?? profile.comfortLevel}</Pill>
           ) : (
             <Empty message="Not set" />
           )}
         </SectionCard>
 
         <SectionCard title="Availability">
-          {user.availability ? (
-            <Pill>{AVAILABILITY_LABEL[user.availability]}</Pill>
+          {profile.availability ? (
+            <Pill>
+              {AVAILABILITY_LABEL[profile.availability] ?? profile.availability}
+            </Pill>
           ) : (
             <Empty message="Not set" />
           )}
@@ -190,9 +180,9 @@ export default async function ProfilePage({
 
       {/* ── Interests ──────────────────────────────────────────── */}
       <SectionCard title="Interests">
-        {user.interestTags.length > 0 ? (
+        {profile.interestTags.length > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {user.interestTags.map((tag) => (
+            {profile.interestTags.map((tag) => (
               <Pill key={tag}>{tag}</Pill>
             ))}
           </div>
@@ -204,7 +194,7 @@ export default async function ProfilePage({
       {/* ── Evidence ───────────────────────────────────────────── */}
       <SectionCard title="Evidence">
         <ul className="flex flex-col gap-2">
-          {user.resumeUploaded ? (
+          {resumeUploaded ? (
             <li className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-sm">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[10px] font-bold text-white dark:bg-white dark:text-neutral-900">
@@ -217,27 +207,19 @@ export default async function ProfilePage({
               </p>
             </li>
           ) : (
-            <li className="flex items-center gap-2 text-sm text-neutral-400 dark:text-neutral-600">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] dark:border-neutral-700">
-                –
-              </span>
-              No resume uploaded
-            </li>
+            <EvidenceRow done={false}>No resume uploaded</EvidenceRow>
           )}
-          <li className="flex items-center gap-2 text-sm text-neutral-400 dark:text-neutral-600">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] dark:border-neutral-700">
-              –
-            </span>
-            GitHub not connected
-          </li>
+          <EvidenceRow done={githubConnected}>
+            {githubConnected ? "GitHub connected" : "GitHub not connected"}
+          </EvidenceRow>
         </ul>
       </SectionCard>
 
       {/* ── Project links ──────────────────────────────────────── */}
       <SectionCard title="Projects">
-        {user.projectLinks.length > 0 ? (
+        {profile.projectLinks.length > 0 ? (
           <ul className="flex flex-col gap-2">
-            {user.projectLinks.map((link) => {
+            {profile.projectLinks.map((link) => {
               let display = link;
               try {
                 const url = new URL(link);
