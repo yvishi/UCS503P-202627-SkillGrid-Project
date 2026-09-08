@@ -16,7 +16,7 @@ export default async function OnboardingPage() {
   });
 
   if (profile?.onboardingCompletedAt) {
-    redirect("/");
+    redirect("/dashboard");
   }
 
   return <OnboardingForm />;

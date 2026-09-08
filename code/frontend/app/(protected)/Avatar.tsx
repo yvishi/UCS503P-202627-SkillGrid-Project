@@ -18,9 +18,11 @@ function initials(name: string) {
 export function Avatar({
   name,
   image,
+  size = "h-16 w-16 text-lg",
 }: {
   name: string;
   image: string | null;
+  size?: string;
 }) {
   const [failed, setFailed] = useState(false);
   const ref = useRef<HTMLImageElement>(null);
@@ -40,14 +42,16 @@ export function Avatar({
         ref={ref}
         src={image}
         alt={name}
-        className="h-16 w-16 rounded-full"
+        className={`${size} shrink-0 rounded-full`}
         onError={() => setFailed(true)}
       />
     );
   }
 
   return (
-    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-neutral-300 bg-neutral-100 text-lg font-semibold text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+    <div
+      className={`flex ${size} shrink-0 items-center justify-center rounded-full border border-neutral-300 bg-neutral-100 font-semibold text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200`}
+    >
       {initials(name)}
     </div>
   );

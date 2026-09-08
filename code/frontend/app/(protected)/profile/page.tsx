@@ -1,108 +1,30 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { AVAILABILITY_LABELS, COMFORT_LABELS } from "@/lib/onboarding-options";
 
-import { Avatar } from "./Avatar";
+import { Avatar } from "../Avatar";
+import { Empty, EvidenceRow, Pill, SectionCard } from "../ui";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Profile",
 };
 
-// ---------------------------------------------------------------------------
-// Display helpers — labels are keyed off the Prisma enums (see schema.prisma).
-// ---------------------------------------------------------------------------
-const COMFORT_LABEL: Record<string, string> = {
-  BEGINNER: "Beginner",
-  INTERMEDIATE: "Intermediate",
-  ADVANCED: "Advanced",
-};
-
-const AVAILABILITY_LABEL: Record<string, string> = {
-  WEEKDAYS: "Weekdays",
-  WEEKENDS: "Weekends",
-  BOTH: "Weekdays & Weekends",
-  FLEXIBLE: "Flexible",
-};
-
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border border-neutral-200 p-5 dark:border-neutral-800">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
-}
-
-function Pill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-block rounded-full border border-neutral-300 px-3 py-1 text-sm dark:border-neutral-700">
-      {children}
-    </span>
-  );
-}
-
-function Empty({ message }: { message: string }) {
-  return (
-    <p className="text-sm text-neutral-400 dark:text-neutral-600">{message}</p>
-  );
-}
-
-function EvidenceRow({ done, children }: { done: boolean; children: React.ReactNode }) {
-  return (
-    <li
-      className={
-        done
-          ? "flex items-center gap-2 text-sm"
-          : "flex items-center gap-2 text-sm text-neutral-400 dark:text-neutral-600"
-      }
-    >
-      <span
-        className={
-          done
-            ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[10px] font-bold text-white dark:bg-white dark:text-neutral-900"
-            : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-neutral-300 text-[10px] dark:border-neutral-700"
-        }
-      >
-        {done ? "✓" : "–"}
-      </span>
-      {children}
-    </li>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 export default async function ProfilePage() {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) {
-    redirect("/");
-  }
+  // The (protected) layout already guarantees a signed-in, onboarded user
+  // (i.e. a Profile row with onboardingCompletedAt set exists).
+  const session = (await auth())!;
+  const userId = session.user!.id!;
 
-  const [profile, evidence] = await Promise.all([
+  const [profileOrNull, evidence] = await Promise.all([
     prisma.profile.findUnique({ where: { userId } }),
     prisma.evidenceRecord.findMany({
       where: { userId },
       select: { source: true },
     }),
   ]);
-
-  // The protected layout already redirects users without a completed profile
-  // to onboarding; this guards the direct-navigation edge case.
-  if (!profile?.onboardingCompletedAt) {
-    redirect("/onboarding");
-  }
+  const profile = profileOrNull!;
 
   const name = session.user?.name ?? session.user?.email ?? "Your profile";
   const email = session.user?.email ?? "";
@@ -145,7 +67,7 @@ export default async function ProfilePage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <SectionCard title="Comfort Level">
           {profile.comfortLevel ? (
-            <Pill>{COMFORT_LABEL[profile.comfortLevel] ?? profile.comfortLevel}</Pill>
+            <Pill>{COMFORT_LABELS[profile.comfortLevel]}</Pill>
           ) : (
             <Empty message="Not set" />
           )}
@@ -153,9 +75,7 @@ export default async function ProfilePage() {
 
         <SectionCard title="Availability">
           {profile.availability ? (
-            <Pill>
-              {AVAILABILITY_LABEL[profile.availability] ?? profile.availability}
-            </Pill>
+            <Pill>{AVAILABILITY_LABELS[profile.availability]}</Pill>
           ) : (
             <Empty message="Not set" />
           )}
@@ -181,7 +101,7 @@ export default async function ProfilePage() {
           {resumeUploaded ? (
             <li className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-sm">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-[10px] font-bold text-white dark:bg-white dark:text-neutral-900">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
                   ✓
                 </span>
                 Resume uploaded
