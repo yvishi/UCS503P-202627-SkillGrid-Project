@@ -72,7 +72,7 @@ export async function completeOnboardingPathA(
     };
   }
 
-  redirect("/");
+  redirect("/dashboard");
 }
 
 function isComfortLevel(value: FormDataEntryValue | null): value is ComfortLevelOption {
@@ -151,5 +151,5 @@ export async function completeOnboardingPathB(
     };
   }
 
-  redirect("/");
+  redirect("/dashboard");
 }

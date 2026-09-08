@@ -34,3 +34,18 @@ export function isInterestTag(value: string): value is InterestTag {
 export function labelize(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
 }
+
+// Shared with both the profile page and the dashboard — keep display
+// labels in one place rather than duplicating per-page maps.
+export const COMFORT_LABELS: Record<ComfortLevelOption, string> = {
+  BEGINNER: "Beginner",
+  INTERMEDIATE: "Intermediate",
+  ADVANCED: "Advanced",
+};
+
+export const AVAILABILITY_LABELS: Record<AvailabilityOption, string> = {
+  WEEKDAYS: "Weekdays",
+  WEEKENDS: "Weekends",
+  BOTH: "Weekdays & Weekends",
+  FLEXIBLE: "Flexible",
+};
