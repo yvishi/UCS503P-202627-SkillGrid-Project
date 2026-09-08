@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { auth, signIn, signOut } from "@/auth";
 
 export default async function Home({
@@ -35,19 +37,27 @@ export default async function Home({
           <p className="text-sm font-medium">
             Signed in as {session.user.name ?? session.user.email}
           </p>
-          <form
-            action={async () => {
-              "use server";
-              await signOut();
-            }}
-          >
-            <button
-              type="submit"
+          <div className="flex gap-2">
+            <Link
+              href="/profile"
               className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium transition hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
             >
-              Sign out
-            </button>
-          </form>
+              View profile
+            </Link>
+            <form
+              action={async () => {
+                "use server";
+                await signOut();
+              }}
+            >
+              <button
+                type="submit"
+                className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium transition hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       ) : (
         <form
