@@ -14,14 +14,19 @@ export function ResumeStep({
   onPassed,
   onSwitchToManual,
 }: {
-  onPassed: (result: { fileUrl: string; extractedSkills: SkillSlug[]; usedOcr: boolean }) => void;
+  onPassed: (result: { fileUrl: string; evidenceId: string; extractedSkills: SkillSlug[]; usedOcr: boolean }) => void;
   onSwitchToManual: () => void;
 }) {
   const [state, formAction, isPending] = useActionState<ResumeCheckState, FormData>(
     async (prev, formData) => {
       const result = await checkResumeAction(prev, formData);
       if (result.status === "ok") {
-        onPassed({ fileUrl: result.fileUrl, extractedSkills: result.extractedSkills, usedOcr: result.usedOcr });
+        onPassed({
+          fileUrl: result.fileUrl,
+          evidenceId: result.evidenceId,
+          extractedSkills: result.extractedSkills,
+          usedOcr: result.usedOcr,
+        });
       }
       return result;
     },

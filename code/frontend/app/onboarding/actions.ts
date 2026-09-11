@@ -3,18 +3,13 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { uploadResume } from "@/lib/blob";
 import { prisma } from "@/lib/prisma";
 import {
   AVAILABILITY_OPTIONS,
   isInterestTag,
   type AvailabilityOption,
 } from "@/lib/onboarding-options";
-import {
-  checkResumeIntegrity,
-  extractResumeText,
-  extractSkillsFromResumeText,
-} from "@/lib/resume-parser";
+import { processResumeUpload } from "@/lib/resume-upload";
 import { isSkillRatingLevel, isSkillSlug, type SkillRatings, type SkillSlug } from "@/lib/skills";
 
 async function requireUserId(): Promise<string> {
@@ -26,8 +21,6 @@ async function requireUserId(): Promise<string> {
   return userId;
 }
 
-const MAX_RESUME_BYTES = 5 * 1024 * 1024;
-
 // ---------------------------------------------------------------------------
 // Resume upload step (Path A, spec section 4.1): fast integrity check is
 // synchronous and blocking. If it passes, this also runs the keyword-based
@@ -38,12 +31,14 @@ const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 //
 // Text extraction tries pdf-parse's text layer first and falls back to
 // OCR.space only for scanned/image-only PDFs (see extractResumeText) --
-// most uploads never touch the OCR API at all.
+// most uploads never touch the OCR API at all. The upload/validate/parse
+// pipeline itself is shared with the post-onboarding re-upload flow (see
+// app/(protected)/profile/resume) via lib/resume-upload.ts.
 // ---------------------------------------------------------------------------
 export type ResumeCheckState =
   | { status: "idle" }
   | { status: "error"; reason: string }
-  | { status: "ok"; fileUrl: string; extractedSkills: SkillSlug[]; usedOcr: boolean };
+  | { status: "ok"; fileUrl: string; evidenceId: string; extractedSkills: SkillSlug[]; usedOcr: boolean };
 
 export async function checkResumeAction(
   _prevState: ResumeCheckState,
@@ -52,60 +47,46 @@ export async function checkResumeAction(
   const userId = await requireUserId();
   const file = formData.get("resume");
 
-  if (!(file instanceof File) || file.size === 0) {
+  if (!(file instanceof File)) {
     return { status: "error", reason: "Please upload a resume to continue." };
   }
-  if (file.size > MAX_RESUME_BYTES) {
-    return { status: "error", reason: "Resume must be 5MB or smaller." };
-  }
-  if (file.type !== "application/pdf") {
-    return { status: "error", reason: "Resume must be a PDF file." };
+
+  const result = await processResumeUpload(userId, file);
+  if (!result.ok) {
+    return { status: "error", reason: result.reason };
   }
 
-  let text: string;
-  let usedOcr: boolean;
+  let evidenceId: string;
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await extractResumeText(buffer, file.name);
-    text = result.text;
-    usedOcr = result.usedOcr;
-    if (result.ocrError) {
-      console.error("OCR fallback failed:", result.ocrError);
-    }
-  } catch (err) {
-    console.error("extractResumeText failed:", err);
-    return {
-      status: "error",
-      reason: "Couldn't read that PDF. Try a different file, or continue manually instead.",
-    };
-  }
-
-  const integrity = checkResumeIntegrity(text);
-  if (!integrity.passed) {
-    return { status: "error", reason: integrity.reason! };
-  }
-
-  const extractedSkills = extractSkillsFromResumeText(text);
-
-  let fileUrl: string;
-  try {
-    fileUrl = await uploadResume(userId, file);
-    await prisma.evidenceRecord.create({
+    const record = await prisma.evidenceRecord.create({
       data: {
         userId,
         source: "RESUME",
-        payload: { fileUrl, status: "parsed", extractedSkills, usedOcr },
+        payload: {
+          fileUrl: result.fileUrl,
+          filename: result.filename,
+          status: "parsed",
+          extractedSkills: result.extractedSkills,
+          usedOcr: result.usedOcr,
+        },
       },
     });
+    evidenceId = record.id;
   } catch (err) {
-    console.error("checkResumeAction upload/save failed:", err);
+    console.error("checkResumeAction save failed:", err);
     return {
       status: "error",
       reason: "Something went wrong uploading your resume. Please try again.",
     };
   }
 
-  return { status: "ok", fileUrl, extractedSkills, usedOcr };
+  return {
+    status: "ok",
+    fileUrl: result.fileUrl,
+    evidenceId,
+    extractedSkills: result.extractedSkills,
+    usedOcr: result.usedOcr,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +100,7 @@ export type SubmitPayload = {
   availability: AvailabilityOption | null;
   projectLinks: string[];
   githubUrl: string;
+  resumeEvidenceId: string | null;
 };
 
 export type SubmitState = { error: string } | null;
@@ -186,6 +168,7 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
           availability: payload.availability!,
           interestTags,
           projectLinks,
+          activeResumeId: payload.resumeEvidenceId,
           onboardingCompletedAt: new Date(),
         },
         update: {
@@ -193,6 +176,7 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
           availability: payload.availability!,
           interestTags,
           projectLinks,
+          activeResumeId: payload.resumeEvidenceId,
           onboardingCompletedAt: new Date(),
         },
       });

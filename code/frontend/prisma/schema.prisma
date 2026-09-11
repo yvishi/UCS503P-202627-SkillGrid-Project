@@ -92,6 +92,12 @@ model Profile {
   // single `comfortLevel` field above, which older screens still read.
   skillRatings Json @default("{}")
 
+  // Which RESUME EvidenceRecord.id is "current" (see app/(protected)/profile/resume) --
+  // a user can upload multiple resumes over time and switch back to an
+  // older one without re-uploading it. No formal relation constraint since
+  // EvidenceRecord rows aren't otherwise addressed individually by id.
+  activeResumeId String?
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())

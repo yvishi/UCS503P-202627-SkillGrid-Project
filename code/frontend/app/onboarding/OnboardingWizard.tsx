@@ -24,6 +24,7 @@ export function OnboardingWizard() {
   const [stepIndex, setStepIndex] = useState(0);
 
   const [resumeFileUrl, setResumeFileUrl] = useState<string | null>(null);
+  const [resumeEvidenceId, setResumeEvidenceId] = useState<string | null>(null);
   const [resumeSkills, setResumeSkills] = useState<SkillSlug[]>([]);
   const [resumeUsedOcr, setResumeUsedOcr] = useState(false);
   const [skillRatings, setSkillRatings] = useState<SkillRatings>({});
@@ -66,6 +67,7 @@ export function OnboardingWizard() {
       availability,
       projectLinks,
       githubUrl,
+      resumeEvidenceId,
     });
     // A successful submit redirects server-side and never returns here.
     if (result?.error) {
@@ -84,8 +86,9 @@ export function OnboardingWizard() {
 
       {currentKey === "resume" && (
         <ResumeStep
-          onPassed={({ fileUrl, extractedSkills, usedOcr }) => {
+          onPassed={({ fileUrl, evidenceId, extractedSkills, usedOcr }) => {
             setResumeFileUrl(fileUrl);
+            setResumeEvidenceId(evidenceId);
             setResumeSkills(extractedSkills);
             setResumeUsedOcr(usedOcr);
             next();

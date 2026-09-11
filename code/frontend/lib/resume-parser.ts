@@ -89,11 +89,26 @@ export function checkResumeIntegrity(text: string): IntegrityCheckResult {
 // (pdf-parse's text layer, or OCR for scanned resumes -- see
 // extractResumeText above). Kept as a separate step from the integrity
 // check to preserve the fast-check/full-parse split the spec calls for.
+// Plain substring matching false-positives on short/common keywords --
+// e.g. "ts" (TypeScript) matches inside "projects", and "git" matches
+// inside "digital". Word-boundary matching fixes both, and also stops
+// "java" matching inside "javascript". Keywords containing punctuation
+// (e.g. "c++", "node.js", " go ") can't use \b cleanly, so those still
+// fall back to substring matching.
+const ALPHANUMERIC_KEYWORD = /^[a-z0-9]+$/;
+
+function keywordAppears(lower: string, keyword: string): boolean {
+  if (ALPHANUMERIC_KEYWORD.test(keyword)) {
+    return new RegExp(`\\b${keyword}\\b`).test(lower);
+  }
+  return lower.includes(keyword);
+}
+
 export function extractSkillsFromResumeText(text: string): SkillSlug[] {
   const lower = text.toLowerCase();
   const found: SkillSlug[] = [];
   for (const [slug, keywords] of Object.entries(SKILL_KEYWORDS) as [SkillSlug, string[]][]) {
-    if (keywords.some((keyword) => lower.includes(keyword))) {
+    if (keywords.some((keyword) => keywordAppears(lower, keyword))) {
       found.push(slug);
     }
   }
