@@ -2,39 +2,40 @@ import { redirect } from "next/navigation";
 
 import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Eyebrow, GoogleIcon, PrimaryButton, SecondaryButton, Stamp } from "@/app/ui/primitives";
+import { Eyebrow, GoogleIcon, PrimaryButton, SecondaryButton, TrustBadge } from "@/app/ui/primitives";
+import { ThemeToggle } from "@/app/ui/ThemeToggle";
 
-const FILE_ENTRIES = [
+const FEATURES = [
   {
-    tag: "RESUME",
+    accent: "trust",
     title: "Evidence, not self-report",
     description:
       "No more \"proficient in React.\" Every skill tag on your profile traces back to a resume, a repo, or peer feedback.",
   },
   {
-    tag: "PARSE",
+    accent: "warm",
     title: "Automatic resume parsing",
     description:
       "Upload your resume once. We extract your skills so you don't have to fill out another form.",
   },
   {
-    tag: "GITHUB",
+    accent: "success",
     title: "GitHub, connected",
     description:
       "Link your GitHub to surface real languages, commits, and contributions — not a checkbox you ticked.",
   },
   {
-    tag: "MATCH",
+    accent: "gold",
     title: "Matching that makes sense",
     description:
       "Find teammates by comfort level, availability, and interests instead of guessing from a resume.",
   },
-];
+] as const;
 
 const INTAKE_STEPS = [
-  { field: "IDENTITY", title: "Sign in", description: "Use your college Google account — no new password to remember." },
-  { field: "DOSSIER", title: "Build your profile", description: "Upload a resume or set your interests and availability by hand." },
-  { field: "OUTCOME", title: "Get matched", description: "Surface teammates and projects that fit how you actually work." },
+  { title: "Sign in", description: "Use your college Google account — no new password to remember." },
+  { title: "Build your profile", description: "Upload a resume or set your interests and availability by hand." },
+  { title: "Get matched", description: "Surface teammates and projects that fit how you actually work." },
 ];
 
 function SignInButton({ variant = "primary" }: { variant?: "primary" | "secondary" }) {
@@ -68,20 +69,23 @@ export default async function LandingPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col bg-bg">
       {/* ── Nav ────────────────────────────────────────────────── */}
-      <header className="border-b border-line">
+      <header className="border-b border-border">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <span className="font-display text-sm font-bold tracking-tight">SkillGrid</span>
-          <SignInButton variant="secondary" />
+          <span className="font-display text-lg font-extrabold tracking-tight text-trust">SkillGrid</span>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <SignInButton variant="secondary" />
+          </div>
         </div>
       </header>
 
       <main className="flex flex-1 flex-col">
         {/* ── Hero ───────────────────────────────────────────────── */}
-        <section className="grid-paper flex flex-col items-center gap-7 border-b border-line px-6 py-24 text-center">
+        <section className="flex flex-col items-center gap-7 px-6 py-24 text-center">
           <Eyebrow>Built for Thapar students</Eyebrow>
-          <h1 className="font-display max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h1 className="font-display max-w-2xl text-4xl font-extrabold tracking-tight sm:text-5xl">
             Trust through evidence,
             <br /> not self-report.
           </h1>
@@ -92,13 +96,13 @@ export default async function LandingPage({
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Stamp>Resume verified</Stamp>
-            <Stamp pending>GitHub pending</Stamp>
-            <Stamp>Peer reviewed</Stamp>
+            <TrustBadge>Resume verified</TrustBadge>
+            <TrustBadge pending>GitHub pending</TrustBadge>
+            <TrustBadge>Peer reviewed</TrustBadge>
           </div>
 
           {error === "AccessDenied" && (
-            <p className="max-w-sm border border-stamp/40 bg-stamp/5 px-4 py-2 text-center text-sm text-stamp">
+            <p className="max-w-sm rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-center text-sm text-danger">
               Sign-in is restricted to college email accounts. Please use your
               college Google account.
             </p>
@@ -107,35 +111,36 @@ export default async function LandingPage({
           <SignInButton />
         </section>
 
-        {/* ── Features, framed as case-file entries ────────────────── */}
-        <section className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 px-6 py-20 sm:grid-cols-2">
-          {FILE_ENTRIES.map((entry) => (
-            <div key={entry.title} className="flex gap-4 border border-line bg-paper-raised p-5">
-              <span className="font-display shrink-0 text-xs font-semibold tracking-[0.1em] text-ink-muted">
-                {entry.tag}
-              </span>
-              <div>
-                <h3 className="font-display font-semibold">{entry.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
-                  {entry.description}
-                </p>
-              </div>
+        {/* ── Features ──────────────────────────────────────────── */}
+        <section className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-5 px-6 py-16 sm:grid-cols-2">
+          {FEATURES.map((feature) => (
+            <div
+              key={feature.title}
+              className="rounded-2xl border border-border bg-surface p-6 shadow-sm"
+              style={{ borderTop: `4px solid var(--${feature.accent})` }}
+            >
+              <h3 className="font-display font-bold">{feature.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+                {feature.description}
+              </p>
             </div>
           ))}
         </section>
 
-        {/* ── How it works, as an intake form ──────────────────────── */}
-        <section className="border-t border-line px-6 py-20">
+        {/* ── How it works ──────────────────────────────────────── */}
+        <section className="bg-surface-alt px-6 py-20">
           <div className="mx-auto flex w-full max-w-5xl flex-col gap-10">
-            <h2 className="font-display text-center text-2xl font-semibold tracking-tight">
+            <h2 className="font-display text-center text-2xl font-bold tracking-tight">
               How it works
             </h2>
-            <div className="grid grid-cols-1 divide-y divide-line border border-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              {INTAKE_STEPS.map((s) => (
-                <div key={s.field} className="flex flex-col gap-2 p-6">
-                  <Eyebrow>{s.field}</Eyebrow>
-                  <h3 className="font-display font-semibold">{s.title}</h3>
-                  <p className="text-sm leading-relaxed text-ink-muted">{s.description}</p>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              {INTAKE_STEPS.map((s, index) => (
+                <div key={s.title} className="rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
+                  <div className="font-display mx-auto mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-trust text-sm font-bold text-surface">
+                    {index + 1}
+                  </div>
+                  <h3 className="font-display font-bold">{s.title}</h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">{s.description}</p>
                 </div>
               ))}
             </div>
@@ -143,7 +148,7 @@ export default async function LandingPage({
         </section>
       </main>
 
-      <footer className="border-t border-line px-6 py-6 text-center text-xs text-ink-muted">
+      <footer className="border-t border-border px-6 py-6 text-center text-xs text-ink-muted">
         SkillGrid — restricted to college Google accounts.
       </footer>
     </div>

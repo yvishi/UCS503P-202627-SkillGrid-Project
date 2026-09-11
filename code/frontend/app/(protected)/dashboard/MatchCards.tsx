@@ -4,7 +4,7 @@ import type { TeamFixture, TeammateFixture } from "@/lib/dashboard-fixtures";
 
 export function TeammateCard({ teammate }: { teammate: TeammateFixture }) {
   return (
-    <div className="flex items-center gap-4 border border-line bg-paper-raised p-4">
+    <div className="flex items-center gap-4 rounded-2xl border border-border bg-surface p-4 shadow-sm">
       <Avatar name={teammate.name} image={null} size="h-11 w-11 text-sm" />
       <div className="min-w-0 flex-1">
         <p className="font-display truncate text-sm font-semibold">{teammate.name}</p>
@@ -28,13 +28,13 @@ export function TeammateCard({ teammate }: { teammate: TeammateFixture }) {
 
 export function TeamCard({ team }: { team: TeamFixture }) {
   return (
-    <div className="flex flex-col gap-3 border border-line bg-paper-raised p-4">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-display text-sm font-semibold">{team.name}</p>
           <p className="text-xs text-ink-muted">{team.event}</p>
         </div>
-        <span className="font-display shrink-0 border border-line-strong px-2 py-0.5 text-[11px]">
+        <span className="font-display shrink-0 rounded-full bg-warm/15 px-2.5 py-0.5 text-[11px] font-semibold text-warm-strong">
           {team.openSlots} open
         </span>
       </div>

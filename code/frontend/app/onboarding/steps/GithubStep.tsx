@@ -33,7 +33,7 @@ export function GithubStep({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="https://github.com/yourusername"
-          className="border border-line-strong bg-paper-raised px-3 py-2 text-sm"
+          className="rounded-xl border border-border-strong bg-surface px-4 py-2.5 text-sm focus:border-trust focus:outline-none"
         />
         <p className="text-xs text-ink-muted">
           Unverified for now — this won&apos;t count as evidence until real GitHub sign-in ships.

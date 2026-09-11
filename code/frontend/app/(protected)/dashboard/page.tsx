@@ -17,13 +17,33 @@ import {
   SectionCard,
   StatCard,
 } from "@/app/ui/primitives";
-import { TeamCard, TeammateCard } from "./MatchCards";
+import { NavTile, tileAccent } from "./NavTile";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Dashboard",
 };
 
 const TOTAL_EVIDENCE_SOURCES = 2; // Resume + GitHub, for now (see EvidenceSource enum).
+
+// One entry per dashboard section -- adding a new one (e.g. "AI Team
+// Builder") is just another entry here; NavTile assigns it the next
+// color in the cycle automatically.
+const DASHBOARD_SECTIONS = [
+  {
+    href: "/dashboard/teammates",
+    eyebrow: "People",
+    title: "Find teammates",
+    description: "Browse students building a profile and looking for a team.",
+    stat: `${TEAMMATE_FIXTURES.length} profiles`,
+  },
+  {
+    href: "/dashboard/teams",
+    eyebrow: "Groups",
+    title: "Find a team",
+    description: "Browse teams with an open slot for a hackathon or project.",
+    stat: `${TEAM_FIXTURES.length} teams`,
+  },
+];
 
 export default async function DashboardPage() {
   // The (protected) layout already guarantees a signed-in, onboarded user.
@@ -116,29 +136,12 @@ export default async function DashboardPage() {
             </ul>
           </SectionCard>
 
-          {/* ── Find Teammates ───────────────────────────────────── */}
-          <SectionCard
-            title="Find teammates"
-            action={<span className="text-xs text-ink-muted">Sample listing</span>}
-          >
-            <div className="flex flex-col gap-3">
-              {TEAMMATE_FIXTURES.map((teammate) => (
-                <TeammateCard key={teammate.id} teammate={teammate} />
-              ))}
-            </div>
-          </SectionCard>
-
-          {/* ── Find a Team ──────────────────────────────────────── */}
-          <SectionCard
-            title="Find a team"
-            action={<span className="text-xs text-ink-muted">Sample listing</span>}
-          >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {TEAM_FIXTURES.map((team) => (
-                <TeamCard key={team.id} team={team} />
-              ))}
-            </div>
-          </SectionCard>
+          {/* ── Section tiles ──────────────────────────────────────── */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {DASHBOARD_SECTIONS.map((section, index) => (
+              <NavTile key={section.href} {...section} accent={tileAccent(index)} />
+            ))}
+          </div>
 
           <SectionCard title="Projects">
             {profile.projectLinks.length > 0 ? (

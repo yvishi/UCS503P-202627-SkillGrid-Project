@@ -1,72 +1,108 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------
- * SkillGrid theme tokens.
- *
- * Concept: a verified dossier on graph paper. The whole point of the
- * product is "trust through evidence, not self-report" -- the visual
- * language leans into that literally: a paper/ledger surface, a grid
- * texture (SkillGrid), and a rubber-stamp motif (see <Stamp/> in
- * app/ui/primitives.tsx) for anything that counts as verified evidence.
+ * SkillGrid theme tokens -- "warm trust": a soft ivory surface, a deep
+ * teal accent (trust) and a warm coral accent (warmth), rounded geometry
+ * throughout. Supports three states: explicit light, explicit dark, and
+ * "system" (no override -- follows prefers-color-scheme). See
+ * ThemeToggle in app/ui/ThemeToggle.tsx for how data-theme gets set.
  * ------------------------------------------------------------------- */
 :root {
-  --paper: #f5f4ef;
-  --paper-raised: #fbfaf6;
-  --ink: #15191d;
-  --ink-muted: #5b6570;
-  --line: #dcdfd8;
-  --line-strong: #b9c0c7;
-  --grid-line: rgba(21, 25, 29, 0.05);
-  --stamp: #b8410f;
-  --stamp-ink: #b8410f;
-  --verified: #1f7a5c;
-  --verified-ink: #14513d;
+  --bg: #fbf6ef;
+  --surface: #ffffff;
+  --surface-alt: #fdf8f1;
+  --ink: #2b2622;
+  --ink-muted: #7a7167;
+  --border: #eae0d2;
+  --border-strong: #d8cbb8;
+
+  --trust: #2f6f6b;
+  --trust-strong: #1f4f4c;
+  --warm: #e8935b;
+  --warm-strong: #c96f3a;
+  --success: #4c9a6a;
+  --success-strong: #35754c;
+  --danger: #c1502e;
+  --gold: #b98a1f;
+  --gold-strong: #8f6b17;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
 }
 
 @theme inline {
-  --color-paper: var(--paper);
-  --color-paper-raised: var(--paper-raised);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
-  --color-stamp: var(--stamp);
-  --color-verified: var(--verified);
-  --font-display: var(--font-plex-mono);
-  --font-sans: var(--font-plex-sans);
-  --font-mono: var(--font-plex-mono);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-trust: var(--trust);
+  --color-trust-strong: var(--trust-strong);
+  --color-warm: var(--warm);
+  --color-warm-strong: var(--warm-strong);
+  --color-success: var(--success);
+  --color-success-strong: var(--success-strong);
+  --color-danger: var(--danger);
+  --color-gold: var(--gold);
+  --color-gold-strong: var(--gold-strong);
+  --font-display: var(--font-jakarta);
+  --font-sans: var(--font-jakarta);
+  --radius-theme-sm: var(--radius-sm);
+  --radius-theme-md: var(--radius-md);
+  --radius-theme-lg: var(--radius-lg);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #14171a;
-    --paper-raised: #1b1f23;
-    --ink: #f1efe8;
-    --ink-muted: #9aa2a9;
-    --line: #2b3034;
-    --line-strong: #3c4247;
-    --grid-line: rgba(241, 239, 232, 0.06);
-    --stamp: #e2652f;
-    --verified: #3fa580;
-    --verified-ink: #bfe9d8;
+  :root:not([data-theme="light"]) {
+    --bg: #201c18;
+    --surface: #2a2521;
+    --surface-alt: #322c26;
+    --ink: #f2ede4;
+    --ink-muted: #a99f92;
+    --border: #3e362e;
+    --border-strong: #4c4238;
+
+    --trust: #6fbfb8;
+    --trust-strong: #8ed2cb;
+    --warm: #f2a874;
+    --warm-strong: #f7be94;
+    --success: #7ecb9b;
+    --success-strong: #98d9b1;
+    --danger: #e0895f;
+    --gold: #d9b25a;
+    --gold-strong: #ecc978;
   }
 }
 
-body {
-  background-color: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+:root[data-theme="dark"] {
+  --bg: #201c18;
+  --surface: #2a2521;
+  --surface-alt: #322c26;
+  --ink: #f2ede4;
+  --ink-muted: #a99f92;
+  --border: #3e362e;
+  --border-strong: #4c4238;
+
+  --trust: #6fbfb8;
+  --trust-strong: #8ed2cb;
+  --warm: #f2a874;
+  --warm-strong: #f7be94;
+  --success: #7ecb9b;
+  --success-strong: #98d9b1;
+  --danger: #e0895f;
+  --gold: #d9b25a;
+  --gold-strong: #ecc978;
 }
 
-/* Graph-paper texture -- literalizes "grid" without being a decorative
-   flourish; it's the same 24px grid the stepper and stat cards align to. */
-.grid-paper {
-  background-image:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 24px 24px;
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
 .font-display {
-  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
 }

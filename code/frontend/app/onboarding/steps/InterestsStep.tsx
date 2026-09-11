@@ -35,10 +35,10 @@ export function InterestsStep({
               key={tag}
               type="button"
               onClick={() => toggle(tag)}
-              className={`font-display border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.04em] transition ${
+              className={`font-display rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
                 active
-                  ? "border-ink bg-ink text-paper"
-                  : "border-line-strong text-ink-muted hover:border-ink hover:text-ink"
+                  ? "border-trust bg-trust text-surface"
+                  : "border-border-strong text-ink-muted hover:border-trust hover:text-trust"
               }`}
             >
               {tag}

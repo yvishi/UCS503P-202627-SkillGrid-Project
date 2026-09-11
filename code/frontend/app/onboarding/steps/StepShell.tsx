@@ -26,18 +26,18 @@ export function StepShell({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-muted">{description}</p>}
       </div>
 
       {children}
 
-      <div className="flex items-center justify-between gap-3 border-t border-line pt-5">
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-5">
         {onBack ? (
           <button
             type="button"
             onClick={onBack}
-            className="font-display text-xs font-semibold uppercase tracking-[0.06em] text-ink-muted transition hover:text-ink"
+            className="font-display text-sm font-medium text-ink-muted transition hover:text-trust"
           >
             ← Back
           </button>

@@ -6,7 +6,7 @@ export function BranchStep({ onChoose }: { onChoose: (path: "A" | "B") => void }
     <div className="flex flex-col items-center gap-8 py-8 text-center">
       <div>
         <Eyebrow>New profile</Eyebrow>
-        <h1 className="font-display mt-2 text-2xl font-semibold tracking-tight">
+        <h1 className="font-display mt-2 text-2xl font-bold tracking-tight">
           Do you have a resume you&apos;d like to upload?
         </h1>
       </div>
@@ -15,7 +15,7 @@ export function BranchStep({ onChoose }: { onChoose: (path: "A" | "B") => void }
         <button
           type="button"
           onClick={() => onChoose("A")}
-          className="border border-line-strong p-5 text-left transition hover:border-ink hover:bg-paper-raised"
+          className="rounded-2xl border border-border-strong bg-surface p-5 text-left shadow-sm transition hover:border-trust hover:shadow-md"
         >
           <p className="font-display font-semibold">Yes, I have a resume</p>
           <p className="mt-1 text-sm text-ink-muted">
@@ -25,7 +25,7 @@ export function BranchStep({ onChoose }: { onChoose: (path: "A" | "B") => void }
         <button
           type="button"
           onClick={() => onChoose("B")}
-          className="border border-line-strong p-5 text-left transition hover:border-ink hover:bg-paper-raised"
+          className="rounded-2xl border border-border-strong bg-surface p-5 text-left shadow-sm transition hover:border-trust hover:shadow-md"
         >
           <p className="font-display font-semibold">No, I&apos;ll set up manually</p>
           <p className="mt-1 text-sm text-ink-muted">

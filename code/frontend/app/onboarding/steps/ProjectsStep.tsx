@@ -44,14 +44,14 @@ export function ProjectsStep({
             value={link}
             onChange={(e) => updateAt(index, e.target.value)}
             placeholder="https://github.com/you/project"
-            className="border border-line-strong bg-paper-raised px-3 py-2 text-sm"
+            className="rounded-xl border border-border-strong bg-surface px-4 py-2.5 text-sm focus:border-trust focus:outline-none"
           />
         ))}
         {links.length < 3 && (
           <button
             type="button"
             onClick={addField}
-            className="font-display self-start text-xs font-semibold uppercase tracking-[0.06em] text-ink-muted transition hover:text-ink"
+            className="font-display self-start text-sm font-medium text-trust transition hover:text-trust-strong"
           >
             + Add another
           </button>

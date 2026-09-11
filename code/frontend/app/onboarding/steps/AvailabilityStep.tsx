@@ -30,8 +30,8 @@ export function AvailabilityStep({
               key={option}
               type="button"
               onClick={() => onChange(option)}
-              className={`border p-4 text-left transition ${
-                active ? "border-ink bg-paper-raised" : "border-line-strong hover:border-ink"
+              className={`rounded-2xl border p-4 text-left shadow-sm transition ${
+                active ? "border-trust bg-trust/5" : "border-border-strong bg-surface hover:border-trust"
               }`}
             >
               <span className="font-display font-semibold">{AVAILABILITY_LABELS[option]}</span>

@@ -41,7 +41,7 @@ export function ReviewStep({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-xl font-semibold tracking-tight">Review & submit</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">Review & submit</h1>
         <p className="mt-1 text-sm text-ink-muted">Check everything below, then submit your profile.</p>
       </div>
 
@@ -49,13 +49,13 @@ export function ReviewStep({
         <ReviewRow label="Resume-extracted skills" onEdit={undefined}>
           <div className="flex flex-wrap gap-2">
             {resumeSkills.map((slug) => (
-              <span key={slug} className="font-display inline-flex items-center gap-1.5 border border-line-strong px-2.5 py-1 text-xs">
+              <span key={slug} className="font-display inline-flex items-center gap-1.5 rounded-full border border-border-strong bg-surface-alt px-3 py-1 text-xs font-medium">
                 {skillLabel(slug)}
                 <button
                   type="button"
                   onClick={() => onResumeSkillsChange(resumeSkills.filter((s) => s !== slug))}
                   aria-label={`Remove ${skillLabel(slug)}`}
-                  className="text-ink-muted hover:text-stamp"
+                  className="text-ink-muted hover:text-danger"
                 >
                   ×
                 </button>
@@ -70,7 +70,7 @@ export function ReviewStep({
                 if (e.target.value) onResumeSkillsChange([...resumeSkills, e.target.value as SkillSlug]);
                 e.target.value = "";
               }}
-              className="font-display mt-2 border border-line-strong bg-paper-raised px-2 py-1.5 text-xs"
+              className="font-display mt-2 rounded-full border border-border-strong bg-surface px-3 py-1.5 text-xs"
             >
               <option value="" disabled>
                 + Add a skill
@@ -135,14 +135,14 @@ export function ReviewStep({
       </ReviewRow>
 
       {error && (
-        <p className="border border-stamp/40 bg-stamp/5 px-4 py-2 text-sm text-stamp">{error}</p>
+        <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</p>
       )}
 
-      <div className="flex items-center justify-between gap-3 border-t border-line pt-5">
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-5">
         <button
           type="button"
           onClick={onBack}
-          className="font-display text-xs font-semibold uppercase tracking-[0.06em] text-ink-muted transition hover:text-ink"
+          className="font-display text-sm font-medium text-ink-muted transition hover:text-trust"
         >
           ← Back
         </button>
@@ -164,7 +164,7 @@ function ReviewRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-line p-4">
+    <div className="rounded-2xl border border-border bg-surface p-4">
       <div className="mb-2 flex items-center justify-between">
         <span className="font-display text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-muted">
           {label}
@@ -173,7 +173,7 @@ function ReviewRow({
           <button
             type="button"
             onClick={onEdit}
-            className="font-display text-[11px] font-semibold uppercase tracking-[0.06em] text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+            className="font-display text-xs font-semibold text-trust underline decoration-trust/40 underline-offset-2 hover:decoration-trust"
           >
             Edit
           </button>

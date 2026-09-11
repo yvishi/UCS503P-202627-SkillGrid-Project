@@ -4,7 +4,7 @@
 
 export function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <span className="font-display inline-block text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+    <span className="font-display inline-block text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
       {children}
     </span>
   );
@@ -20,7 +20,7 @@ export function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-line bg-paper-raised p-5">
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-3">
         <Eyebrow>{title}</Eyebrow>
         {action}
@@ -32,7 +32,7 @@ export function SectionCard({
 
 export function Pill({ children }: { children: React.ReactNode }) {
   return (
-    <span className="font-display inline-block border border-line-strong px-2.5 py-1 text-xs">
+    <span className="font-display inline-block rounded-full border border-border-strong bg-surface-alt px-3 py-1 text-xs font-medium">
       {children}
     </span>
   );
@@ -58,10 +58,8 @@ export function EvidenceRow({
       }`}
     >
       <span
-        className={`font-display flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold ${
-          done
-            ? "border-verified bg-verified text-paper-raised"
-            : "border-line-strong"
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+          done ? "bg-success text-surface" : "border border-border-strong"
         }`}
       >
         {done ? "✓" : "–"}
@@ -75,14 +73,14 @@ export function ProgressBar({ fraction }: { fraction: number }) {
   const pct = Math.round(Math.min(1, Math.max(0, fraction)) * 100);
   return (
     <div
-      className="h-1.5 w-full overflow-hidden bg-line/60"
+      className="h-2 w-full overflow-hidden rounded-full bg-surface-alt"
       role="progressbar"
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
     >
       <div
-        className="h-full bg-verified transition-all"
+        className="h-full rounded-full bg-success transition-all"
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -99,24 +97,23 @@ export function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="border border-line bg-paper-raised p-5">
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
       <Eyebrow>{label}</Eyebrow>
-      <p className="font-display mt-2 text-2xl font-semibold tracking-tight">
-        {value}
-      </p>
+      <p className="font-display mt-2 text-2xl font-bold tracking-tight">{value}</p>
       {hint && <p className="mt-1 text-sm text-ink-muted">{hint}</p>}
     </div>
   );
 }
 
 /**
- * The signature element: a rubber-stamp badge for anything that counts as
- * verified evidence (resume on file, GitHub connected, etc). Literalizes
- * "trust through evidence, not self-report" instead of using a generic
- * checkmark badge. `pending` renders the same ring in a muted ink tone for
- * evidence that's been submitted but not yet verified.
+ * The signature element: a warm, rounded badge for anything that counts
+ * as verified evidence (resume on file, GitHub connected, etc). A soft
+ * tinted pill with a checkmark reads as reassuring rather than
+ * bureaucratic -- literalizing "trust" without feeling like paperwork.
+ * `pending` renders a neutral outline for evidence submitted but not yet
+ * verified.
  */
-export function Stamp({
+export function TrustBadge({
   children,
   pending = false,
   className = "",
@@ -127,23 +124,24 @@ export function Stamp({
 }) {
   return (
     <span
-      className={`font-display relative inline-flex -rotate-3 items-center gap-1.5 border-2 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.1em] ${
+      className={`font-display inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
         pending
-          ? "border-ink-muted/50 text-ink-muted"
-          : "border-stamp text-stamp"
+          ? "border border-border-strong text-ink-muted"
+          : "bg-success/15 text-success-strong"
       } ${className}`}
     >
-      <span
-        className={`absolute inset-[3px] border ${pending ? "border-ink-muted/30" : "border-stamp/40"}`}
-        aria-hidden="true"
-      />
+      {!pending && (
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+          <path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.8 6.8-6.8a1 1 0 0 1 1.4 0Z" />
+        </svg>
+      )}
       {children}
     </span>
   );
 }
 
 const buttonBase =
-  "font-display inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold uppercase tracking-[0.04em] transition disabled:cursor-not-allowed disabled:opacity-40";
+  "font-display inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40";
 
 export function PrimaryButton({
   className = "",
@@ -152,7 +150,7 @@ export function PrimaryButton({
   return (
     <button
       {...props}
-      className={`${buttonBase} border-2 border-ink bg-ink text-paper hover:bg-transparent hover:text-ink ${className}`}
+      className={`${buttonBase} bg-trust text-surface shadow-sm hover:bg-trust-strong ${className}`}
     />
   );
 }
@@ -164,7 +162,7 @@ export function SecondaryButton({
   return (
     <button
       {...props}
-      className={`${buttonBase} border-2 border-line-strong text-ink hover:border-ink ${className}`}
+      className={`${buttonBase} border border-border-strong text-ink hover:border-trust hover:text-trust ${className}`}
     />
   );
 }

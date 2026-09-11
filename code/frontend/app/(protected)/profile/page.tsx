@@ -6,7 +6,7 @@ import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
 import { parseSkillRatings, skillLabel, SKILL_RATING_LABELS } from "@/lib/skills";
 
 import { Avatar } from "@/app/ui/Avatar";
-import { Empty, EvidenceRow, Pill, SectionCard, Stamp } from "@/app/ui/primitives";
+import { Empty, EvidenceRow, Pill, SectionCard, TrustBadge } from "@/app/ui/primitives";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Profile",
@@ -99,12 +99,12 @@ export default async function ProfilePage() {
       <SectionCard title="Evidence on file">
         <div className="flex flex-wrap gap-3">
           {resumeUploaded ? (
-            <Stamp>Resume filed</Stamp>
+            <TrustBadge>Resume filed</TrustBadge>
           ) : (
             <EvidenceRow done={false}>No resume uploaded</EvidenceRow>
           )}
           {githubConnected ? (
-            <Stamp>GitHub linked</Stamp>
+            <TrustBadge>GitHub linked</TrustBadge>
           ) : (
             <EvidenceRow done={false}>GitHub not connected</EvidenceRow>
           )}
@@ -129,7 +129,7 @@ export default async function ProfilePage() {
                     href={link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
+                    className="text-sm text-trust underline decoration-border-strong underline-offset-2 hover:decoration-trust"
                   >
                     {display}
                   </a>
