@@ -12,7 +12,7 @@ import {
 } from "@/lib/onboarding-options";
 import {
   checkResumeIntegrity,
-  extractPdfText,
+  extractResumeText,
   extractSkillsFromResumeText,
 } from "@/lib/resume-parser";
 import { isSkillRatingLevel, isSkillSlug, type SkillRatings, type SkillSlug } from "@/lib/skills";
@@ -35,11 +35,15 @@ const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 // this phase, so the two are sequenced in one request rather than one
 // blocking and one async, but they remain separate functions/concerns
 // (lib/resume-parser.ts) so a real queue can be dropped in later.
+//
+// Text extraction tries pdf-parse's text layer first and falls back to
+// OCR.space only for scanned/image-only PDFs (see extractResumeText) --
+// most uploads never touch the OCR API at all.
 // ---------------------------------------------------------------------------
 export type ResumeCheckState =
   | { status: "idle" }
   | { status: "error"; reason: string }
-  | { status: "ok"; fileUrl: string; extractedSkills: SkillSlug[] };
+  | { status: "ok"; fileUrl: string; extractedSkills: SkillSlug[]; usedOcr: boolean };
 
 export async function checkResumeAction(
   _prevState: ResumeCheckState,
@@ -59,11 +63,17 @@ export async function checkResumeAction(
   }
 
   let text: string;
+  let usedOcr: boolean;
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
-    text = await extractPdfText(buffer);
+    const result = await extractResumeText(buffer, file.name);
+    text = result.text;
+    usedOcr = result.usedOcr;
+    if (result.ocrError) {
+      console.error("OCR fallback failed:", result.ocrError);
+    }
   } catch (err) {
-    console.error("extractPdfText failed:", err);
+    console.error("extractResumeText failed:", err);
     return {
       status: "error",
       reason: "Couldn't read that PDF. Try a different file, or continue manually instead.",
@@ -84,7 +94,7 @@ export async function checkResumeAction(
       data: {
         userId,
         source: "RESUME",
-        payload: { fileUrl, status: "parsed", extractedSkills },
+        payload: { fileUrl, status: "parsed", extractedSkills, usedOcr },
       },
     });
   } catch (err) {
@@ -95,7 +105,7 @@ export async function checkResumeAction(
     };
   }
 
-  return { status: "ok", fileUrl, extractedSkills };
+  return { status: "ok", fileUrl, extractedSkills, usedOcr };
 }
 
 // ---------------------------------------------------------------------------

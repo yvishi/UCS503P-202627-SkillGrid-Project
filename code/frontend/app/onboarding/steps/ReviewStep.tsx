@@ -9,6 +9,7 @@ import type { StepKey } from "../Stepper";
 // far, plus (Path A only) the resume-extracted skill tags reconciled here.
 export function ReviewStep({
   hasResume,
+  resumeUsedOcr,
   resumeSkills,
   onResumeSkillsChange,
   skillRatings,
@@ -23,6 +24,7 @@ export function ReviewStep({
   error,
 }: {
   hasResume: boolean;
+  resumeUsedOcr: boolean;
   resumeSkills: SkillSlug[];
   onResumeSkillsChange: (next: SkillSlug[]) => void;
   skillRatings: SkillRatings;
@@ -46,7 +48,10 @@ export function ReviewStep({
       </div>
 
       {hasResume && (
-        <ReviewRow label="Resume-extracted skills" onEdit={undefined}>
+        <ReviewRow
+          label={resumeUsedOcr ? "Resume-extracted skills (scanned via OCR)" : "Resume-extracted skills"}
+          onEdit={undefined}
+        >
           <div className="flex flex-wrap gap-2">
             {resumeSkills.map((slug) => (
               <span key={slug} className="font-display inline-flex items-center gap-1.5 rounded-full border border-border-strong bg-surface-alt px-3 py-1 text-xs font-medium">
