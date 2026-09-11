@@ -186,9 +186,11 @@ export default async function DashboardPage() {
               <SecondaryButton type="button" disabled title="Coming soon">
                 Connect GitHub (coming soon)
               </SecondaryButton>
-              <SecondaryButton type="button" disabled title="Coming soon">
-                Re-upload resume (coming soon)
-              </SecondaryButton>
+              <Link href="/profile/resume">
+                <SecondaryButton type="button" className="w-full">
+                  Manage resumes
+                </SecondaryButton>
+              </Link>
             </div>
           </SectionCard>
 

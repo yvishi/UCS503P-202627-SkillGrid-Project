@@ -24,7 +24,9 @@ export function OnboardingWizard() {
   const [stepIndex, setStepIndex] = useState(0);
 
   const [resumeFileUrl, setResumeFileUrl] = useState<string | null>(null);
+  const [resumeEvidenceId, setResumeEvidenceId] = useState<string | null>(null);
   const [resumeSkills, setResumeSkills] = useState<SkillSlug[]>([]);
+  const [resumeUsedOcr, setResumeUsedOcr] = useState(false);
   const [skillRatings, setSkillRatings] = useState<SkillRatings>({});
   const [interestTags, setInterestTags] = useState<string[]>([]);
   const [availability, setAvailability] = useState<AvailabilityOption | null>(null);
@@ -65,6 +67,7 @@ export function OnboardingWizard() {
       availability,
       projectLinks,
       githubUrl,
+      resumeEvidenceId,
     });
     // A successful submit redirects server-side and never returns here.
     if (result?.error) {
@@ -83,9 +86,11 @@ export function OnboardingWizard() {
 
       {currentKey === "resume" && (
         <ResumeStep
-          onPassed={({ fileUrl, extractedSkills }) => {
+          onPassed={({ fileUrl, evidenceId, extractedSkills, usedOcr }) => {
             setResumeFileUrl(fileUrl);
+            setResumeEvidenceId(evidenceId);
             setResumeSkills(extractedSkills);
+            setResumeUsedOcr(usedOcr);
             next();
           }}
           onSwitchToManual={() => {
@@ -123,6 +128,7 @@ export function OnboardingWizard() {
       {currentKey === "review" && (
         <ReviewStep
           hasResume={!!resumeFileUrl}
+          resumeUsedOcr={resumeUsedOcr}
           resumeSkills={resumeSkills}
           onResumeSkillsChange={setResumeSkills}
           skillRatings={skillRatings}
