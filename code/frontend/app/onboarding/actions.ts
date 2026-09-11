@@ -158,6 +158,16 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
     }
   }
 
+  // resumeEvidenceId comes from client state -- verify it's actually this
+  // user's own RESUME record before trusting it, the same check
+  // selectResumeAction makes (app/(protected)/profile/resume/actions.ts).
+  if (payload.resumeEvidenceId) {
+    const record = await prisma.evidenceRecord.findUnique({ where: { id: payload.resumeEvidenceId } });
+    if (!record || record.userId !== userId || record.source !== "RESUME") {
+      return { error: "Invalid resume selection." };
+    }
+  }
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.profile.upsert({
