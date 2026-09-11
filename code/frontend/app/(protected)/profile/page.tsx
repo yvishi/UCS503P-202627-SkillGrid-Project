@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { AVAILABILITY_LABELS, COMFORT_LABELS } from "@/lib/onboarding-options";
+import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
+import { parseSkillRatings, skillLabel, SKILL_RATING_LABELS } from "@/lib/skills";
 
-import { Avatar } from "../Avatar";
-import { Empty, EvidenceRow, Pill, SectionCard } from "../ui";
+import { Avatar } from "@/app/ui/Avatar";
+import { Empty, EvidenceRow, Pill, SectionCard, TrustBadge } from "@/app/ui/primitives";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Profile",
@@ -32,6 +33,8 @@ export default async function ProfilePage() {
 
   const resumeUploaded = evidence.some((e) => e.source === "RESUME");
   const githubConnected = evidence.some((e) => e.source === "GITHUB");
+  const skillRatings = parseSkillRatings(profile.skillRatings);
+  const ratedSkills = Object.entries(skillRatings) as [string, keyof typeof SKILL_RATING_LABELS][];
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
@@ -39,37 +42,34 @@ export default async function ProfilePage() {
       <div className="flex items-center gap-5">
         <Avatar name={name} image={image} />
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
-          {email && (
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              {email}
-            </p>
-          )}
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
+            {name}
+          </h1>
+          {email && <p className="text-sm text-ink-muted">{email}</p>}
           {profile.githubUsername && (
-            <p className="mt-0.5 text-sm text-neutral-500 dark:text-neutral-400">
-              GitHub:{" "}
-              <span className="font-medium text-neutral-700 dark:text-neutral-300">
-                @{profile.githubUsername}
-              </span>
+            <p className="mt-0.5 text-sm text-ink-muted">
+              GitHub: <span className="font-medium text-ink">@{profile.githubUsername}</span>
             </p>
           )}
         </div>
       </div>
 
       {/* ── Bio ────────────────────────────────────────────────── */}
-      {profile.bio && (
-        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          {profile.bio}
-        </p>
-      )}
+      {profile.bio && <p className="text-sm text-ink-muted">{profile.bio}</p>}
 
-      {/* ── Comfort level + availability ───────────────────────── */}
+      {/* ── Skills + availability ──────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <SectionCard title="Comfort Level">
-          {profile.comfortLevel ? (
-            <Pill>{COMFORT_LABELS[profile.comfortLevel]}</Pill>
+        <SectionCard title="Skills">
+          {ratedSkills.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {ratedSkills.map(([slug, level]) => (
+                <Pill key={slug}>
+                  {skillLabel(slug)} · {SKILL_RATING_LABELS[level]}
+                </Pill>
+              ))}
+            </div>
           ) : (
-            <Empty message="Not set" />
+            <Empty message="No skills rated" />
           )}
         </SectionCard>
 
@@ -96,27 +96,19 @@ export default async function ProfilePage() {
       </SectionCard>
 
       {/* ── Evidence ───────────────────────────────────────────── */}
-      <SectionCard title="Evidence">
-        <ul className="flex flex-col gap-2">
+      <SectionCard title="Evidence on file">
+        <div className="flex flex-wrap gap-3">
           {resumeUploaded ? (
-            <li className="flex flex-col gap-1">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-                  ✓
-                </span>
-                Resume uploaded
-              </div>
-              <p className="pl-7 text-xs text-neutral-400 dark:text-neutral-600">
-                Queued for processing — skills will appear here once extracted.
-              </p>
-            </li>
+            <TrustBadge>Resume filed</TrustBadge>
           ) : (
             <EvidenceRow done={false}>No resume uploaded</EvidenceRow>
           )}
-          <EvidenceRow done={githubConnected}>
-            {githubConnected ? "GitHub connected" : "GitHub not connected"}
-          </EvidenceRow>
-        </ul>
+          {githubConnected ? (
+            <TrustBadge>GitHub linked</TrustBadge>
+          ) : (
+            <EvidenceRow done={false}>GitHub not connected</EvidenceRow>
+          )}
+        </div>
       </SectionCard>
 
       {/* ── Project links ──────────────────────────────────────── */}
@@ -137,7 +129,7 @@ export default async function ProfilePage() {
                     href={link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-neutral-700 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+                    className="text-sm text-trust underline decoration-border-strong underline-offset-2 hover:decoration-trust"
                   >
                     {display}
                   </a>

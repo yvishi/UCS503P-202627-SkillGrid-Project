@@ -1,31 +1,26 @@
 import Link from "next/link";
 
 import { auth, signOut } from "@/auth";
-
-import { Avatar } from "./Avatar";
+import { Avatar } from "@/app/ui/Avatar";
+import { SecondaryButton } from "@/app/ui/primitives";
+import { ThemeToggle } from "@/app/ui/ThemeToggle";
 
 export async function NavBar() {
   const session = await auth();
   const user = session?.user;
 
   return (
-    <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white/80 backdrop-blur dark:border-neutral-800 dark:bg-neutral-950/80">
+    <header className="sticky top-0 z-10 border-b border-border bg-bg/90 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-3">
         <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="font-semibold tracking-tight">
+          <Link href="/dashboard" className="font-display text-lg font-extrabold tracking-tight text-trust">
             SkillGrid
           </Link>
-          <nav className="flex items-center gap-4 text-sm text-neutral-500 dark:text-neutral-400">
-            <Link
-              href="/dashboard"
-              className="transition hover:text-neutral-900 dark:hover:text-white"
-            >
+          <nav className="font-display flex items-center gap-5 text-sm font-medium text-ink-muted">
+            <Link href="/dashboard" className="transition hover:text-ink">
               Dashboard
             </Link>
-            <Link
-              href="/profile"
-              className="transition hover:text-neutral-900 dark:hover:text-white"
-            >
+            <Link href="/profile" className="transition hover:text-ink">
               Profile
             </Link>
           </nav>
@@ -33,6 +28,7 @@ export async function NavBar() {
 
         {user && (
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Avatar
               name={user.name ?? user.email ?? "You"}
               image={user.image ?? null}
@@ -44,12 +40,9 @@ export async function NavBar() {
                 await signOut();
               }}
             >
-              <button
-                type="submit"
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium transition hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              >
+              <SecondaryButton type="submit" className="px-3 py-1.5 text-xs">
                 Sign out
-              </button>
+              </SecondaryButton>
             </form>
           </div>
         )}

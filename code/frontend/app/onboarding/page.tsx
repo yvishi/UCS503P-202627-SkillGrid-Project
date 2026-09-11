@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-import { OnboardingForm } from "./OnboardingForm";
+import { OnboardingWizard } from "./OnboardingWizard";
 
 export default async function OnboardingPage() {
   const session = await auth();
@@ -19,5 +19,9 @@ export default async function OnboardingPage() {
     redirect("/dashboard");
   }
 
-  return <OnboardingForm />;
+  return (
+    <main className="mx-auto w-full max-w-xl flex-1 px-6 py-12">
+      <OnboardingWizard />
+    </main>
+  );
 }
