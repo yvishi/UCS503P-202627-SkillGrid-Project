@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------
+ * SkillGrid theme tokens.
+ *
+ * Concept: a verified dossier on graph paper. The whole point of the
+ * product is "trust through evidence, not self-report" -- the visual
+ * language leans into that literally: a paper/ledger surface, a grid
+ * texture (SkillGrid), and a rubber-stamp motif (see <Stamp/> in
+ * app/ui/primitives.tsx) for anything that counts as verified evidence.
+ * ------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f5f4ef;
+  --paper-raised: #fbfaf6;
+  --ink: #15191d;
+  --ink-muted: #5b6570;
+  --line: #dcdfd8;
+  --line-strong: #b9c0c7;
+  --grid-line: rgba(21, 25, 29, 0.05);
+  --stamp: #b8410f;
+  --stamp-ink: #b8410f;
+  --verified: #1f7a5c;
+  --verified-ink: #14513d;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-stamp: var(--stamp);
+  --color-verified: var(--verified);
+  --font-display: var(--font-plex-mono);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #14171a;
+    --paper-raised: #1b1f23;
+    --ink: #f1efe8;
+    --ink-muted: #9aa2a9;
+    --line: #2b3034;
+    --line-strong: #3c4247;
+    --grid-line: rgba(241, 239, 232, 0.06);
+    --stamp: #e2652f;
+    --verified: #3fa580;
+    --verified-ink: #bfe9d8;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Graph-paper texture -- literalizes "grid" without being a decorative
+   flourish; it's the same 24px grid the stepper and stat cards align to. */
+.grid-paper {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.font-display {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
 }

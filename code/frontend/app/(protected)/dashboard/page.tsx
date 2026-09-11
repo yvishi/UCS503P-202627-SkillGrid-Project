@@ -3,17 +3,21 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { AVAILABILITY_LABELS, COMFORT_LABELS } from "@/lib/onboarding-options";
+import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
+import { parseSkillRatings, skillLabel } from "@/lib/skills";
+import { TEAMMATE_FIXTURES, TEAM_FIXTURES } from "@/lib/dashboard-fixtures";
 
-import { Avatar } from "../Avatar";
+import { Avatar } from "@/app/ui/Avatar";
 import {
   Empty,
   EvidenceRow,
   Pill,
   ProgressBar,
+  SecondaryButton,
   SectionCard,
   StatCard,
-} from "../ui";
+} from "@/app/ui/primitives";
+import { TeamCard, TeammateCard } from "./MatchCards";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Dashboard",
@@ -44,16 +48,18 @@ export default async function DashboardPage() {
   const connectedCount = [resumeUploaded, githubConnected].filter(
     Boolean,
   ).length;
+  const skillRatings = parseSkillRatings(profile.skillRatings);
+  const ratedSkillSlugs = Object.keys(skillRatings);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
       {/* ── Welcome ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
             Welcome back, {firstName}
           </h1>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="mt-1 text-sm text-ink-muted">
             Here&apos;s where your SkillGrid profile stands today.
           </p>
         </div>
@@ -77,11 +83,13 @@ export default async function DashboardPage() {
           }
         />
         <StatCard
-          label="Comfort level"
-          value={
-            profile.comfortLevel ? COMFORT_LABELS[profile.comfortLevel] : "—"
+          label="Skills on file"
+          value={String(ratedSkillSlugs.length)}
+          hint={
+            ratedSkillSlugs.length > 0
+              ? ratedSkillSlugs.slice(0, 2).map(skillLabel).join(", ")
+              : "None rated yet"
           }
-          hint="From onboarding"
         />
       </div>
 
@@ -108,6 +116,30 @@ export default async function DashboardPage() {
             </ul>
           </SectionCard>
 
+          {/* ── Find Teammates ───────────────────────────────────── */}
+          <SectionCard
+            title="Find teammates"
+            action={<span className="text-xs text-ink-muted">Sample listing</span>}
+          >
+            <div className="flex flex-col gap-3">
+              {TEAMMATE_FIXTURES.map((teammate) => (
+                <TeammateCard key={teammate.id} teammate={teammate} />
+              ))}
+            </div>
+          </SectionCard>
+
+          {/* ── Find a Team ──────────────────────────────────────── */}
+          <SectionCard
+            title="Find a team"
+            action={<span className="text-xs text-ink-muted">Sample listing</span>}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {TEAM_FIXTURES.map((team) => (
+                <TeamCard key={team.id} team={team} />
+              ))}
+            </div>
+          </SectionCard>
+
           <SectionCard title="Projects">
             {profile.projectLinks.length > 0 ? (
               <ul className="flex flex-col gap-2">
@@ -125,7 +157,7 @@ export default async function DashboardPage() {
                         href={link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-neutral-700 underline underline-offset-2 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+                        className="text-sm text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink"
                       >
                         {display}
                       </a>
@@ -143,28 +175,17 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-6">
           <SectionCard title="Quick actions">
             <div className="flex flex-col gap-2">
-              <Link
-                href="/profile"
-                className="rounded-md border border-neutral-300 px-4 py-2 text-center text-sm font-medium transition hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-              >
-                View full profile
+              <Link href="/profile">
+                <SecondaryButton type="button" className="w-full">
+                  View full profile
+                </SecondaryButton>
               </Link>
-              <button
-                type="button"
-                disabled
-                title="Coming soon"
-                className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-400 dark:border-neutral-700"
-              >
+              <SecondaryButton type="button" disabled title="Coming soon">
                 Connect GitHub (coming soon)
-              </button>
-              <button
-                type="button"
-                disabled
-                title="Coming soon"
-                className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-400 dark:border-neutral-700"
-              >
+              </SecondaryButton>
+              <SecondaryButton type="button" disabled title="Coming soon">
                 Re-upload resume (coming soon)
-              </button>
+              </SecondaryButton>
             </div>
           </SectionCard>
 

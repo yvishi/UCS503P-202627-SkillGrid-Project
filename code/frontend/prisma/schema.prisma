@@ -87,6 +87,11 @@ model Profile {
   availability          Availability?
   projectLinks          String[]      @default([])
 
+  // Per-skill self-assessment from onboarding v2 (skill slug -> ComfortLevel),
+  // e.g. {"react": "INTERMEDIATE", "docker": "BEGINNER"}. Additive to the
+  // single `comfortLevel` field above, which older screens still read.
+  skillRatings Json @default("{}")
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
