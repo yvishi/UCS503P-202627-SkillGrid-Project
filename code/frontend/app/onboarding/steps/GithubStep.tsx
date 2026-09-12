@@ -1,20 +1,22 @@
 "use client";
 
+import { ConnectGithubButton } from "@/app/ui/ConnectGithubButton";
+import { TrustBadge } from "@/app/ui/primitives";
 import { StepShell } from "./StepShell";
 
-// Spec section 8: real GitHub OAuth is the intended implementation, but no
-// GitHub OAuth app credentials exist in this environment, so this uses the
-// documented temporary fallback -- an unverified profile URL, clearly
-// labeled as such. Swap for real OAuth before this goes near real users.
+// Real GitHub OAuth (see app/api/github) -- connecting mid-wizard means a
+// full-page redirect off-site to GitHub and back, so OnboardingWizard
+// persists its state across that round-trip (sessionStorage) and restores
+// `username`/`connectionError` from the callback's redirect query params.
 export function GithubStep({
-  value,
-  onChange,
+  username,
+  connectionError,
   onContinue,
   onSkip,
   onBack,
 }: {
-  value: string;
-  onChange: (next: string) => void;
+  username: string | null;
+  connectionError: boolean;
   onContinue: () => void;
   onSkip: () => void;
   onBack?: () => void;
@@ -22,21 +24,22 @@ export function GithubStep({
   return (
     <StepShell
       title="Link your GitHub"
-      description="Optional. Real GitHub sign-in is coming soon — for now, drop your profile URL."
+      description="Optional. Connecting pulls your public repo languages in as evidence."
       onContinue={onContinue}
       onSkip={onSkip}
       onBack={onBack}
     >
-      <div className="flex flex-col gap-2">
-        <input
-          type="url"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="https://github.com/yourusername"
-          className="rounded-xl border border-border-strong bg-surface px-4 py-2.5 text-sm focus:border-trust focus:outline-none"
-        />
+      <div className="flex flex-col items-start gap-3">
+        {username ? (
+          <TrustBadge>Connected as @{username}</TrustBadge>
+        ) : (
+          <ConnectGithubButton returnTo="/onboarding" />
+        )}
+        {connectionError && (
+          <p className="text-xs text-danger">Something went wrong connecting GitHub. Please try again.</p>
+        )}
         <p className="text-xs text-ink-muted">
-          Unverified for now — this won&apos;t count as evidence until real GitHub sign-in ships.
+          We only read your public profile and repos — nothing is posted on your behalf.
         </p>
       </div>
     </StepShell>

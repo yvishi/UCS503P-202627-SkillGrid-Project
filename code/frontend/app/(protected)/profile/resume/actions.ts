@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { mergeSkillRatings, processResumeUpload } from "@/lib/resume-upload";
-import { isSkillSlug, parseSkillRatings, type SkillSlug } from "@/lib/skills";
+import { processResumeUpload } from "@/lib/resume-upload";
+import { isSkillSlug, mergeSkillRatings, parseSkillRatings, type SkillSlug } from "@/lib/skills";
 
 async function requireUserId(): Promise<string> {
   const session = await auth();

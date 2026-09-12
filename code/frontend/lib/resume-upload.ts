@@ -4,7 +4,7 @@ import {
   extractResumeText,
   extractSkillsFromResumeText,
 } from "@/lib/resume-parser";
-import type { SkillRatings, SkillSlug } from "@/lib/skills";
+import type { SkillSlug } from "@/lib/skills";
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 
@@ -67,18 +67,4 @@ export async function processResumeUpload(userId: string, file: File): Promise<R
     console.error("uploadResume failed:", err);
     return { ok: false, reason: "Something went wrong uploading your resume. Please try again." };
   }
-}
-
-// Merges newly-seen skills into existing ratings without touching ones the
-// user already rated. New skills default to "Comfortable" (the same
-// assumption onboarding review makes for resume-extracted tags: it showed
-// up on the resume, so it's not a cold start).
-export function mergeSkillRatings(existing: SkillRatings, newSkills: SkillSlug[]): SkillRatings {
-  const merged: SkillRatings = { ...existing };
-  for (const slug of newSkills) {
-    if (!merged[slug]) {
-      merged[slug] = "INTERMEDIATE";
-    }
-  }
-  return merged;
 }

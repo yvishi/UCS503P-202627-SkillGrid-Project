@@ -6,23 +6,29 @@ import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
 import { parseSkillRatings, skillLabel, SKILL_RATING_LABELS } from "@/lib/skills";
 
 import { Avatar } from "@/app/ui/Avatar";
+import { ConnectGithubButton, GithubConnectionBanner } from "@/app/ui/ConnectGithubButton";
 import { Empty, EvidenceRow, Pill, SectionCard, TrustBadge } from "@/app/ui/primitives";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Profile",
 };
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ github?: string }>;
+}) {
   // The (protected) layout already guarantees a signed-in, onboarded user
   // (i.e. a Profile row with onboardingCompletedAt set exists).
   const session = (await auth())!;
   const userId = session.user!.id!;
+  const { github: githubStatus } = await searchParams;
 
   const [profileOrNull, evidence] = await Promise.all([
     prisma.profile.findUnique({ where: { userId } }),
     prisma.evidenceRecord.findMany({
       where: { userId },
-      select: { source: true },
+      select: { source: true, payload: true },
     }),
   ]);
   const profile = profileOrNull!;
@@ -32,12 +38,16 @@ export default async function ProfilePage() {
   const image = session.user?.image ?? null;
 
   const resumeUploaded = evidence.some((e) => e.source === "RESUME");
-  const githubConnected = evidence.some((e) => e.source === "GITHUB");
+  const githubConnected = evidence.some(
+    (e) => e.source === "GITHUB" && (e.payload as { verified?: boolean })?.verified === true,
+  );
   const skillRatings = parseSkillRatings(profile.skillRatings);
   const ratedSkills = Object.entries(skillRatings) as [string, keyof typeof SKILL_RATING_LABELS][];
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-12">
+      <GithubConnectionBanner status={githubStatus} />
+
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-5">
         <Avatar name={name} image={image} />
@@ -106,7 +116,7 @@ export default async function ProfilePage() {
           {githubConnected ? (
             <TrustBadge>GitHub linked</TrustBadge>
           ) : (
-            <EvidenceRow done={false}>GitHub not connected</EvidenceRow>
+            <ConnectGithubButton returnTo="/profile" className="px-3 py-1.5 text-xs" />
           )}
         </div>
       </SectionCard>

@@ -16,7 +16,7 @@ export function ReviewStep({
   interestTags,
   availability,
   projectLinks,
-  githubUrl,
+  githubUsername,
   onEditStep,
   onBack,
   onSubmit,
@@ -31,7 +31,7 @@ export function ReviewStep({
   interestTags: string[];
   availability: AvailabilityOption | null;
   projectLinks: string[];
-  githubUrl: string;
+  githubUsername: string | null;
   onEditStep: (step: StepKey) => void;
   onBack: () => void;
   onSubmit: () => void;
@@ -136,7 +136,7 @@ export function ReviewStep({
       </ReviewRow>
 
       <ReviewRow label="GitHub" onEdit={() => onEditStep("github")}>
-        <span className="text-sm">{githubUrl || "Not connected"}</span>
+        <span className="text-sm">{githubUsername ? `Connected as @${githubUsername}` : "Not connected"}</span>
       </ReviewRow>
 
       {error && (

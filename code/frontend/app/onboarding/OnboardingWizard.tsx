@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { AvailabilityOption } from "@/lib/onboarding-options";
 import type { SkillRatings, SkillSlug } from "@/lib/skills";
@@ -19,34 +19,110 @@ import { ReviewStep } from "./steps/ReviewStep";
 const STEPS_A: StepKey[] = ["resume", "skills", "interests", "availability", "projects", "github", "review"];
 const STEPS_B: StepKey[] = ["skills", "interests", "availability", "projects", "github", "review"];
 
+// Connecting GitHub mid-wizard means a full-page redirect off to GitHub's
+// consent screen and back (see app/api/github) -- that reload would wipe
+// all the plain React state below, so it's mirrored into sessionStorage
+// and restored on mount. Nothing here is sensitive (no tokens -- those
+// stay server-side), just the same form values the wizard already tracks.
+const STORAGE_KEY = "skillgrid_onboarding_wizard_v1";
+
+type WizardState = {
+  path: "A" | "B" | null;
+  stepIndex: number;
+  resumeFileUrl: string | null;
+  resumeEvidenceId: string | null;
+  resumeSkills: SkillSlug[];
+  resumeUsedOcr: boolean;
+  skillRatings: SkillRatings;
+  interestTags: string[];
+  availability: AvailabilityOption | null;
+  projectLinks: string[];
+  githubEvidenceId: string | null;
+  githubUsername: string | null;
+};
+
+const INITIAL_STATE: WizardState = {
+  path: null,
+  stepIndex: 0,
+  resumeFileUrl: null,
+  resumeEvidenceId: null,
+  resumeSkills: [],
+  resumeUsedOcr: false,
+  skillRatings: {},
+  interestTags: [],
+  availability: null,
+  projectLinks: [],
+  githubEvidenceId: null,
+  githubUsername: null,
+};
+
+function loadSavedState(): WizardState | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return { ...INITIAL_STATE, ...(JSON.parse(raw) as Partial<WizardState>) };
+  } catch {
+    return null;
+  }
+}
+
+// Restoring any in-progress wizard state plus the GitHub OAuth callback's
+// redirect query params (?github=connected&evidenceId=&username=, or
+// ?github=error) belongs in the initial-state computation, not an effect
+// -- this genuinely is the initial state, not a later sync from an
+// external system. Runs once per mount; SSR gets INITIAL_STATE (no
+// window), then the client's first render restores for real.
+function computeInitialState(): WizardState {
+  if (typeof window === "undefined") return INITIAL_STATE;
+  const base = loadSavedState() ?? INITIAL_STATE;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("github") !== "connected") return base;
+  return {
+    ...base,
+    githubEvidenceId: params.get("evidenceId") ?? base.githubEvidenceId,
+    githubUsername: params.get("username") ?? base.githubUsername,
+  };
+}
+
 export function OnboardingWizard() {
-  const [path, setPath] = useState<"A" | "B" | null>(null);
-  const [stepIndex, setStepIndex] = useState(0);
-
-  const [resumeFileUrl, setResumeFileUrl] = useState<string | null>(null);
-  const [resumeEvidenceId, setResumeEvidenceId] = useState<string | null>(null);
-  const [resumeSkills, setResumeSkills] = useState<SkillSlug[]>([]);
-  const [resumeUsedOcr, setResumeUsedOcr] = useState(false);
-  const [skillRatings, setSkillRatings] = useState<SkillRatings>({});
-  const [interestTags, setInterestTags] = useState<string[]>([]);
-  const [availability, setAvailability] = useState<AvailabilityOption | null>(null);
-  const [projectLinks, setProjectLinks] = useState<string[]>([]);
-  const [githubUrl, setGithubUrl] = useState("");
-
+  const [state, setState] = useState<WizardState>(computeInitialState);
+  const [githubConnectionError] = useState(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("github") === "error",
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const steps = path === "A" ? STEPS_A : STEPS_B;
-  const currentKey = steps[stepIndex];
+  // Strip the OAuth callback's query params so a refresh doesn't re-apply
+  // them. Doesn't call setState -- this is a real side effect (URL), not
+  // state sync, so it belongs in an effect.
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // best-effort only (private browsing, storage disabled, etc.)
+    }
+  }, [state]);
+
+  const steps = state.path === "A" ? STEPS_A : STEPS_B;
+  const currentKey = steps[state.stepIndex];
+
+  function patch(next: Partial<WizardState>) {
+    setState((prev) => ({ ...prev, ...next }));
+  }
   function goTo(step: StepKey) {
-    setStepIndex(steps.indexOf(step));
+    setState((prev) => ({ ...prev, stepIndex: steps.indexOf(step) }));
   }
   function next() {
-    setStepIndex((i) => Math.min(i + 1, steps.length - 1));
+    setState((prev) => ({ ...prev, stepIndex: Math.min(prev.stepIndex + 1, steps.length - 1) }));
   }
   function back() {
-    setStepIndex((i) => Math.max(i - 1, 0));
+    setState((prev) => ({ ...prev, stepIndex: Math.max(prev.stepIndex - 1, 0) }));
   }
 
   async function handleSubmit() {
@@ -56,18 +132,18 @@ export function OnboardingWizard() {
     // Reconcile resume-extracted tags into skillRatings: anything still
     // present in the editable review list that wasn't manually rated gets
     // a default "Comfortable" rating, since it showed up on the resume.
-    const merged: SkillRatings = { ...skillRatings };
-    for (const slug of resumeSkills) {
+    const merged: SkillRatings = { ...state.skillRatings };
+    for (const slug of state.resumeSkills) {
       if (!merged[slug]) merged[slug] = "INTERMEDIATE";
     }
 
     const result = await submitOnboardingAction({
       skillRatings: merged,
-      interestTags,
-      availability,
-      projectLinks,
-      githubUrl,
-      resumeEvidenceId,
+      interestTags: state.interestTags,
+      availability: state.availability,
+      projectLinks: state.projectLinks,
+      resumeEvidenceId: state.resumeEvidenceId,
+      githubEvidenceId: state.githubEvidenceId,
     });
     // A successful submit redirects server-side and never returns here.
     if (result?.error) {
@@ -76,8 +152,8 @@ export function OnboardingWizard() {
     }
   }
 
-  if (!path) {
-    return <BranchStep onChoose={setPath} />;
+  if (!state.path) {
+    return <BranchStep onChoose={(path) => patch({ path })} />;
   }
 
   return (
@@ -87,55 +163,76 @@ export function OnboardingWizard() {
       {currentKey === "resume" && (
         <ResumeStep
           onPassed={({ fileUrl, evidenceId, extractedSkills, usedOcr }) => {
-            setResumeFileUrl(fileUrl);
-            setResumeEvidenceId(evidenceId);
-            setResumeSkills(extractedSkills);
-            setResumeUsedOcr(usedOcr);
+            patch({
+              resumeFileUrl: fileUrl,
+              resumeEvidenceId: evidenceId,
+              resumeSkills: extractedSkills,
+              resumeUsedOcr: usedOcr,
+            });
             next();
           }}
-          onSwitchToManual={() => {
-            setPath("B");
-            setStepIndex(0);
-          }}
+          onSwitchToManual={() => patch({ path: "B", stepIndex: 0 })}
         />
       )}
 
       {currentKey === "skills" && (
         <SkillsStep
-          value={skillRatings}
-          onChange={setSkillRatings}
+          value={state.skillRatings}
+          onChange={(skillRatings) => patch({ skillRatings })}
           onContinue={next}
-          onBack={path === "A" ? back : undefined}
+          onBack={state.path === "A" ? back : undefined}
         />
       )}
 
       {currentKey === "interests" && (
-        <InterestsStep value={interestTags} onChange={setInterestTags} onContinue={next} onBack={back} />
+        <InterestsStep
+          value={state.interestTags}
+          onChange={(interestTags) => patch({ interestTags })}
+          onContinue={next}
+          onBack={back}
+        />
       )}
 
       {currentKey === "availability" && (
-        <AvailabilityStep value={availability} onChange={setAvailability} onContinue={next} onBack={back} />
+        <AvailabilityStep
+          value={state.availability}
+          onChange={(availability) => patch({ availability })}
+          onContinue={next}
+          onBack={back}
+        />
       )}
 
       {currentKey === "projects" && (
-        <ProjectsStep value={projectLinks} onChange={setProjectLinks} onContinue={next} onSkip={next} onBack={back} />
+        <ProjectsStep
+          value={state.projectLinks}
+          onChange={(projectLinks) => patch({ projectLinks })}
+          onContinue={next}
+          onSkip={next}
+          onBack={back}
+        />
       )}
 
       {currentKey === "github" && (
-        <GithubStep value={githubUrl} onChange={setGithubUrl} onContinue={next} onSkip={next} onBack={back} />
+        <GithubStep
+          username={state.githubUsername}
+          connectionError={githubConnectionError}
+          onContinue={next}
+          onSkip={next}
+          onBack={back}
+        />
       )}
 
       {currentKey === "review" && (
         <ReviewStep
-          hasResume={!!resumeFileUrl}
-          resumeUsedOcr={resumeUsedOcr}
-          resumeSkills={resumeSkills}
-          onResumeSkillsChange={setResumeSkills}
-          skillRatings={skillRatings}
-          interestTags={interestTags}
-          availability={availability}
-          projectLinks={projectLinks}
-          githubUrl={githubUrl}
+          hasResume={!!state.resumeFileUrl}
+          resumeUsedOcr={state.resumeUsedOcr}
+          resumeSkills={state.resumeSkills}
+          onResumeSkillsChange={(resumeSkills) => patch({ resumeSkills })}
+          skillRatings={state.skillRatings}
+          interestTags={state.interestTags}
+          availability={state.availability}
+          projectLinks={state.projectLinks}
+          githubUsername={state.githubUsername}
           onEditStep={goTo}
           onBack={back}
           onSubmit={handleSubmit}
