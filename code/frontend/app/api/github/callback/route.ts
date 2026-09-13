@@ -66,10 +66,15 @@ export async function GET(request: NextRequest) {
       repoCount: languageNames.length,
     };
 
-    const profile = await prisma.profile.findUnique({ where: { userId } });
-    const mergedSkillRatings = mergeSkillRatings(parseSkillRatings(profile?.skillRatings), languages);
-
     const record = await prisma.$transaction(async (tx) => {
+      // Read-then-merge-then-write on skillRatings, so this must read the
+      // current profile inside the same transaction it writes in -- reading
+      // outside would let a concurrent connect (two tabs, or a race with
+      // onboarding's own profile write) read the same stale skillRatings
+      // and clobber whichever write commits second.
+      const profile = await tx.profile.findUnique({ where: { userId } });
+      const mergedSkillRatings = mergeSkillRatings(parseSkillRatings(profile?.skillRatings), languages);
+
       // Replace rather than accumulate -- one connected GitHub account per
       // user (also clears out the old unverified-URL placeholder record).
       await tx.evidenceRecord.deleteMany({ where: { userId, source: "GITHUB" } });

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getEvidenceStatus } from "@/lib/evidence";
 import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
 import { parseSkillRatings, skillLabel, SKILL_RATING_LABELS } from "@/lib/skills";
 
@@ -24,12 +25,9 @@ export default async function ProfilePage({
   const userId = session.user!.id!;
   const { github: githubStatus } = await searchParams;
 
-  const [profileOrNull, evidence] = await Promise.all([
+  const [profileOrNull, { resumeUploaded, githubConnected }] = await Promise.all([
     prisma.profile.findUnique({ where: { userId } }),
-    prisma.evidenceRecord.findMany({
-      where: { userId },
-      select: { source: true, payload: true },
-    }),
+    getEvidenceStatus(userId),
   ]);
   const profile = profileOrNull!;
 
@@ -37,10 +35,6 @@ export default async function ProfilePage({
   const email = session.user?.email ?? "";
   const image = session.user?.image ?? null;
 
-  const resumeUploaded = evidence.some((e) => e.source === "RESUME");
-  const githubConnected = evidence.some(
-    (e) => e.source === "GITHUB" && (e.payload as { verified?: boolean })?.verified === true,
-  );
   const skillRatings = parseSkillRatings(profile.skillRatings);
   const ratedSkills = Object.entries(skillRatings) as [string, keyof typeof SKILL_RATING_LABELS][];
 

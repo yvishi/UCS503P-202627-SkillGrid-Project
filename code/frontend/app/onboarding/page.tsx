@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
 
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-6 py-12">
-      <OnboardingWizard />
+      <OnboardingWizard userId={session.user.id} />
     </main>
   );
 }

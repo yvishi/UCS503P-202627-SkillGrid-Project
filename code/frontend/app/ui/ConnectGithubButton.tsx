@@ -1,3 +1,6 @@
+import type { GithubReturnTo } from "@/lib/github";
+
+import { ClearGithubQueryParam } from "./ClearGithubQueryParam";
 import { buttonBase } from "./primitives";
 
 // The one "Connect GitHub" trigger, reused by dashboard quick actions,
@@ -12,7 +15,7 @@ export function ConnectGithubButton({
   className = "",
   children = "Connect GitHub",
 }: {
-  returnTo: "/dashboard" | "/profile" | "/onboarding";
+  returnTo: GithubReturnTo;
   variant?: "primary" | "secondary";
   className?: string;
   children?: React.ReactNode;
@@ -39,21 +42,22 @@ export function ConnectGithubButton({
 // wizard handles its own client-side banner instead, since it needs to
 // restore in-progress wizard state across the redirect too).
 export function GithubConnectionBanner({ status }: { status: string | undefined }) {
-  if (status === "connected") {
-    return (
-      <p className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success-strong">
-        GitHub connected.
-      </p>
-    );
-  }
-  if (status === "error") {
-    return (
-      <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
-        Something went wrong connecting GitHub. Please try again.
-      </p>
-    );
-  }
-  return null;
+  if (status !== "connected" && status !== "error") return null;
+
+  return (
+    <>
+      <ClearGithubQueryParam />
+      {status === "connected" ? (
+        <p className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success-strong">
+          GitHub connected.
+        </p>
+      ) : (
+        <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+          Something went wrong connecting GitHub. Please try again.
+        </p>
+      )}
+    </>
+  );
 }
 
 function GithubMark() {

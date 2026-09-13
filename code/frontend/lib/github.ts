@@ -11,8 +11,12 @@ export const OAUTH_RETURN_TO_COOKIE = "github_oauth_return_to";
 
 // The three places "Connect GitHub" appears (dashboard, onboarding,
 // profile) -- an allowlist rather than a generic "starts with /" check,
-// since this drives a server-side redirect target.
-const RETURN_TO_ALLOWLIST = ["/dashboard", "/profile", "/onboarding"] as const;
+// since this drives a server-side redirect target. Exported so
+// ConnectGithubButton's `returnTo` prop type is derived from this single
+// list instead of keeping its own literal union in sync by hand.
+export const RETURN_TO_ALLOWLIST = ["/dashboard", "/profile", "/onboarding"] as const;
+
+export type GithubReturnTo = (typeof RETURN_TO_ALLOWLIST)[number];
 
 export function sanitizeReturnTo(value: string | null | undefined, fallback: string): string {
   if (value && (RETURN_TO_ALLOWLIST as readonly string[]).includes(value)) {

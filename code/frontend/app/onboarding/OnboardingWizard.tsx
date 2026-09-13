@@ -24,7 +24,11 @@ const STEPS_B: StepKey[] = ["skills", "interests", "availability", "projects", "
 // all the plain React state below, so it's mirrored into sessionStorage
 // and restored on mount. Nothing here is sensitive (no tokens -- those
 // stay server-side), just the same form values the wizard already tracks.
-const STORAGE_KEY = "skillgrid_onboarding_wizard_v1";
+// Keyed per-user so a shared/lab machine can't rehydrate one signed-in
+// user's in-progress answers into the next user's session.
+function getStorageKey(userId: string): string {
+  return `skillgrid_onboarding_wizard_v1:${userId}`;
+}
 
 type WizardState = {
   path: "A" | "B" | null;
@@ -56,13 +60,21 @@ const INITIAL_STATE: WizardState = {
   githubUsername: null,
 };
 
-function loadSavedState(): WizardState | null {
+function loadSavedState(userId: string): WizardState | null {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const raw = sessionStorage.getItem(getStorageKey(userId));
     if (!raw) return null;
     return { ...INITIAL_STATE, ...(JSON.parse(raw) as Partial<WizardState>) };
   } catch {
     return null;
+  }
+}
+
+function clearSavedState(userId: string) {
+  try {
+    sessionStorage.removeItem(getStorageKey(userId));
+  } catch {
+    // best-effort only (private browsing, storage disabled, etc.)
   }
 }
 
@@ -72,9 +84,9 @@ function loadSavedState(): WizardState | null {
 // -- this genuinely is the initial state, not a later sync from an
 // external system. Runs once per mount; SSR gets INITIAL_STATE (no
 // window), then the client's first render restores for real.
-function computeInitialState(): WizardState {
+function computeInitialState(userId: string): WizardState {
   if (typeof window === "undefined") return INITIAL_STATE;
-  const base = loadSavedState() ?? INITIAL_STATE;
+  const base = loadSavedState(userId) ?? INITIAL_STATE;
   const params = new URLSearchParams(window.location.search);
   if (params.get("github") !== "connected") return base;
   return {
@@ -84,8 +96,8 @@ function computeInitialState(): WizardState {
   };
 }
 
-export function OnboardingWizard() {
-  const [state, setState] = useState<WizardState>(computeInitialState);
+export function OnboardingWizard({ userId }: { userId: string }) {
+  const [state, setState] = useState<WizardState>(() => computeInitialState(userId));
   const [githubConnectionError] = useState(
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("github") === "error",
   );
@@ -103,11 +115,11 @@ export function OnboardingWizard() {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      sessionStorage.setItem(getStorageKey(userId), JSON.stringify(state));
     } catch {
       // best-effort only (private browsing, storage disabled, etc.)
     }
-  }, [state]);
+  }, [state, userId]);
 
   const steps = state.path === "A" ? STEPS_A : STEPS_B;
   const currentKey = steps[state.stepIndex];
@@ -137,18 +149,27 @@ export function OnboardingWizard() {
       if (!merged[slug]) merged[slug] = "INTERMEDIATE";
     }
 
-    const result = await submitOnboardingAction({
-      skillRatings: merged,
-      interestTags: state.interestTags,
-      availability: state.availability,
-      projectLinks: state.projectLinks,
-      resumeEvidenceId: state.resumeEvidenceId,
-      githubEvidenceId: state.githubEvidenceId,
-    });
-    // A successful submit redirects server-side and never returns here.
-    if (result?.error) {
-      setSubmitError(result.error);
-      setIsSubmitting(false);
+    try {
+      const result = await submitOnboardingAction({
+        skillRatings: merged,
+        interestTags: state.interestTags,
+        availability: state.availability,
+        projectLinks: state.projectLinks,
+        resumeEvidenceId: state.resumeEvidenceId,
+        githubEvidenceId: state.githubEvidenceId,
+      });
+      // A successful submit redirects server-side and never returns here --
+      // it throws instead, caught below.
+      if (result?.error) {
+        setSubmitError(result.error);
+        setIsSubmitting(false);
+      }
+    } catch (err) {
+      // submitOnboardingAction's redirect() on success surfaces here as a
+      // thrown NEXT_REDIRECT. Onboarding is done, so drop the draft before
+      // letting Next.js perform the actual navigation.
+      clearSavedState(userId);
+      throw err;
     }
   }
 

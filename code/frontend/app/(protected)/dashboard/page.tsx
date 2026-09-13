@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getEvidenceStatus } from "@/lib/evidence";
 import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
 import { parseSkillRatings, skillLabel } from "@/lib/skills";
 import { TEAMMATE_FIXTURES, TEAM_FIXTURES } from "@/lib/dashboard-fixtures";
@@ -56,12 +57,9 @@ export default async function DashboardPage({
   const userId = session.user!.id!;
   const { github: githubStatus } = await searchParams;
 
-  const [profileOrNull, evidence] = await Promise.all([
+  const [profileOrNull, { resumeUploaded, githubConnected }] = await Promise.all([
     prisma.profile.findUnique({ where: { userId } }),
-    prisma.evidenceRecord.findMany({
-      where: { userId },
-      select: { source: true, payload: true },
-    }),
+    getEvidenceStatus(userId),
   ]);
   const profile = profileOrNull!;
 
@@ -69,10 +67,6 @@ export default async function DashboardPage({
   const firstName = name.split(" ")[0];
   const image = session.user?.image ?? null;
 
-  const resumeUploaded = evidence.some((e) => e.source === "RESUME");
-  const githubConnected = evidence.some(
-    (e) => e.source === "GITHUB" && (e.payload as { verified?: boolean })?.verified === true,
-  );
   const connectedCount = [resumeUploaded, githubConnected].filter(
     Boolean,
   ).length;
