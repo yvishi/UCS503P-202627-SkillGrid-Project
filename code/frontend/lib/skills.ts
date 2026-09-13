@@ -70,6 +70,22 @@ export function parseSkillRatings(value: unknown): SkillRatings {
   return result;
 }
 
+// Merges newly-seen skills into existing ratings without touching ones the
+// user already rated. New skills default to "Comfortable" -- the same
+// assumption onboarding review makes for resume-extracted tags: it showed
+// up on the resume (or the user's GitHub repos), so it's not a cold start.
+// Shared by the resume upload flow (lib/resume-upload.ts) and GitHub
+// evidence (lib/github.ts).
+export function mergeSkillRatings(existing: SkillRatings, newSkills: SkillSlug[]): SkillRatings {
+  const merged: SkillRatings = { ...existing };
+  for (const slug of newSkills) {
+    if (!merged[slug]) {
+      merged[slug] = "INTERMEDIATE";
+    }
+  }
+  return merged;
+}
+
 // Keyword variants used by the slow-parse keyword matcher (lib/resume-parser.ts)
 // to catch common spellings/aliases a resume might use for a given skill.
 export const SKILL_KEYWORDS: Record<SkillSlug, string[]> = {
@@ -94,3 +110,24 @@ export const SKILL_KEYWORDS: Record<SkillSlug, string[]> = {
   figma: ["figma"],
   solidity: ["solidity"],
 };
+
+// GitHub's linguist language names (as returned by the repos API's
+// `language` field) that map onto the fixed skill list -- used by
+// lib/github.ts to derive skills from a connected account's public repos.
+// Only true programming languages map cleanly; frameworks/tools in SKILLS
+// (React, Docker, AWS, etc.) aren't linguist-detected languages, so they're
+// left out here rather than guessed at.
+const GITHUB_LANGUAGE_TO_SKILL: Record<string, SkillSlug> = {
+  JavaScript: "javascript",
+  TypeScript: "typescript",
+  Python: "python",
+  Java: "java",
+  "C++": "cpp",
+  Go: "go",
+  Dockerfile: "docker",
+  Solidity: "solidity",
+};
+
+export function mapGithubLanguageToSkill(language: string): SkillSlug | null {
+  return GITHUB_LANGUAGE_TO_SKILL[language] ?? null;
+}

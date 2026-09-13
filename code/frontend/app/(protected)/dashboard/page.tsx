@@ -3,11 +3,13 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getEvidenceStatus } from "@/lib/evidence";
 import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
 import { parseSkillRatings, skillLabel } from "@/lib/skills";
 import { TEAMMATE_FIXTURES, TEAM_FIXTURES } from "@/lib/dashboard-fixtures";
 
 import { Avatar } from "@/app/ui/Avatar";
+import { ConnectGithubButton, GithubConnectionBanner } from "@/app/ui/ConnectGithubButton";
 import {
   Empty,
   EvidenceRow,
@@ -45,17 +47,19 @@ const DASHBOARD_SECTIONS = [
   },
 ];
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ github?: string }>;
+}) {
   // The (protected) layout already guarantees a signed-in, onboarded user.
   const session = (await auth())!;
   const userId = session.user!.id!;
+  const { github: githubStatus } = await searchParams;
 
-  const [profileOrNull, evidence] = await Promise.all([
+  const [profileOrNull, { resumeUploaded, githubConnected }] = await Promise.all([
     prisma.profile.findUnique({ where: { userId } }),
-    prisma.evidenceRecord.findMany({
-      where: { userId },
-      select: { source: true },
-    }),
+    getEvidenceStatus(userId),
   ]);
   const profile = profileOrNull!;
 
@@ -63,8 +67,6 @@ export default async function DashboardPage() {
   const firstName = name.split(" ")[0];
   const image = session.user?.image ?? null;
 
-  const resumeUploaded = evidence.some((e) => e.source === "RESUME");
-  const githubConnected = evidence.some((e) => e.source === "GITHUB");
   const connectedCount = [resumeUploaded, githubConnected].filter(
     Boolean,
   ).length;
@@ -73,6 +75,8 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-10">
+      <GithubConnectionBanner status={githubStatus} />
+
       {/* ── Welcome ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -183,9 +187,13 @@ export default async function DashboardPage() {
                   View full profile
                 </SecondaryButton>
               </Link>
-              <SecondaryButton type="button" disabled title="Coming soon">
-                Connect GitHub (coming soon)
-              </SecondaryButton>
+              {githubConnected ? (
+                <SecondaryButton type="button" disabled title="GitHub is connected">
+                  GitHub connected
+                </SecondaryButton>
+              ) : (
+                <ConnectGithubButton returnTo="/dashboard" className="w-full" />
+              )}
               <Link href="/profile/resume">
                 <SecondaryButton type="button" className="w-full">
                   Manage resumes

@@ -97,7 +97,7 @@ export default async function LandingPage({
 
           <div className="flex flex-wrap items-center justify-center gap-3">
             <TrustBadge>Resume verified</TrustBadge>
-            <TrustBadge pending>GitHub pending</TrustBadge>
+            <TrustBadge>GitHub linked</TrustBadge>
             <TrustBadge>Peer reviewed</TrustBadge>
           </div>
 

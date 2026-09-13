@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 
 // Only accounts on the college's Google Workspace domain may sign in.
 // GitHub is intentionally NOT an auth provider here — it's connected
-// later, per-user, as an evidence source (see feature/github-evidence).
+// later, per-user, as an evidence source, with its own hand-rolled OAuth
+// flow outside Auth.js (see lib/github.ts and app/api/github).
 const ALLOWED_EMAIL_DOMAIN = process.env.ALLOWED_EMAIL_DOMAIN;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

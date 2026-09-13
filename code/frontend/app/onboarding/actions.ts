@@ -10,7 +10,13 @@ import {
   type AvailabilityOption,
 } from "@/lib/onboarding-options";
 import { processResumeUpload } from "@/lib/resume-upload";
-import { isSkillRatingLevel, isSkillSlug, type SkillRatings, type SkillSlug } from "@/lib/skills";
+import {
+  isSkillRatingLevel,
+  isSkillSlug,
+  mergeSkillRatings,
+  type SkillRatings,
+  type SkillSlug,
+} from "@/lib/skills";
 
 async function requireUserId(): Promise<string> {
   const session = await auth();
@@ -99,8 +105,8 @@ export type SubmitPayload = {
   interestTags: string[];
   availability: AvailabilityOption | null;
   projectLinks: string[];
-  githubUrl: string;
   resumeEvidenceId: string | null;
+  githubEvidenceId: string | null;
 };
 
 export type SubmitState = { error: string } | null;
@@ -149,18 +155,13 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
     }
   }
 
-  const githubUrl = payload.githubUrl.trim();
-  if (githubUrl) {
-    try {
-      new URL(githubUrl);
-    } catch {
-      return { error: `"${githubUrl}" is not a valid GitHub URL.` };
-    }
-  }
-
-  // resumeEvidenceId comes from client state -- verify it's actually this
-  // user's own RESUME record before trusting it, the same check
-  // selectResumeAction makes (app/(protected)/profile/resume/actions.ts).
+  // resumeEvidenceId/githubEvidenceId come from client state -- verify
+  // they're actually this user's own records before trusting them, the
+  // same check selectResumeAction makes
+  // (app/(protected)/profile/resume/actions.ts). The GitHub record itself
+  // was already created by the OAuth callback (app/api/github/callback) --
+  // this just confirms ownership and folds its languages into the final
+  // skillRatings, since that's the authoritative write for onboarding.
   if (payload.resumeEvidenceId) {
     const record = await prisma.evidenceRecord.findUnique({ where: { id: payload.resumeEvidenceId } });
     if (!record || record.userId !== userId || record.source !== "RESUME") {
@@ -168,40 +169,39 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
     }
   }
 
-  try {
-    await prisma.$transaction(async (tx) => {
-      await tx.profile.upsert({
-        where: { userId },
-        create: {
-          userId,
-          skillRatings,
-          availability: payload.availability!,
-          interestTags,
-          projectLinks,
-          activeResumeId: payload.resumeEvidenceId,
-          onboardingCompletedAt: new Date(),
-        },
-        update: {
-          skillRatings,
-          availability: payload.availability!,
-          interestTags,
-          projectLinks,
-          activeResumeId: payload.resumeEvidenceId,
-          onboardingCompletedAt: new Date(),
-        },
-      });
+  let finalSkillRatings = skillRatings;
+  if (payload.githubEvidenceId) {
+    const record = await prisma.evidenceRecord.findUnique({ where: { id: payload.githubEvidenceId } });
+    if (!record || record.userId !== userId || record.source !== "GITHUB") {
+      return { error: "Invalid GitHub connection." };
+    }
+    const githubPayload = record.payload as { languages?: string[] };
+    const languages = (githubPayload.languages ?? []).filter(
+      (s): s is SkillSlug => typeof s === "string" && isSkillSlug(s),
+    );
+    finalSkillRatings = mergeSkillRatings(finalSkillRatings, languages);
+  }
 
-      // Placeholder evidence source (spec section 8): an unverified URL
-      // field, not real OAuth, since no GitHub app credentials exist here.
-      if (githubUrl) {
-        await tx.evidenceRecord.create({
-          data: {
-            userId,
-            source: "GITHUB",
-            payload: { url: githubUrl, verified: false },
-          },
-        });
-      }
+  try {
+    await prisma.profile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        skillRatings: finalSkillRatings,
+        availability: payload.availability!,
+        interestTags,
+        projectLinks,
+        activeResumeId: payload.resumeEvidenceId,
+        onboardingCompletedAt: new Date(),
+      },
+      update: {
+        skillRatings: finalSkillRatings,
+        availability: payload.availability!,
+        interestTags,
+        projectLinks,
+        activeResumeId: payload.resumeEvidenceId,
+        onboardingCompletedAt: new Date(),
+      },
     });
   } catch (err) {
     console.error("submitOnboardingAction failed:", err);
