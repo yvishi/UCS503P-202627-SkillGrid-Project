@@ -1,0 +1,57 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\title{\bfseries Week 1: Onboarding to SkillGrid}
+\author{Saksham Boran \\ \small Roll No: 1024030856}
+\date{2 September 2026}
+
+\begin{document}
+\maketitle
+
+\section{Context}
+This first week had no commits under my name -- the initial
+scaffolding, CI/CD pipeline, and database setup were built by
+Yash. My time went into getting oriented in the codebase and the
+stack, and into planning what I'd be picking up once there was a
+real feature surface to build on.
+
+\section{Getting Oriented}
+Read through the scaffolded Next.js App Router project structure,
+the Vercel CI/CD pipeline configuration, and the initial Prisma
+schema (\texttt{User}/\texttt{Account}/\texttt{Session} for
+NextAuth, plus the project-specific \texttt{Profile} and
+\texttt{EvidenceRecord} models). Most of this stack was new to me
+going in -- in particular:
+\begin{itemize}[leftmargin=0.7cm]
+  \item The App Router's split between server and client
+    components, and why that split matters for anything touching
+    the database directly (server components / server actions can
+    call Prisma; client components can't).
+  \item Prisma's migration model (\texttt{schema.prisma} as the
+    source of truth, migrations applied against the real Neon
+    Postgres instance rather than a local throwaway database).
+  \item Why the project pins specific package versions
+    (\texttt{next-auth@5.0.0-beta.32}, Prisma 6.19.3) instead of
+    taking whatever \texttt{latest} resolves to -- both cases
+    where the newest tag targets a different architecture
+    (Pages Router, a prerelease config rewrite) than what the
+    project actually needs.
+\end{itemize}
+
+\section{Planning}
+Discussed with the team how work would split going forward given
+the two onboarding paths already designed into the schema
+(resume/GitHub evidence vs.\ self-reported profile data). Agreed
+to pick up user-facing account surfaces -- starting with a profile
+page -- once the authentication and onboarding groundwork landed,
+which happened the following week.
+
+\section{Outcome}
+No code shipped this week. Ended it with a working local
+environment, a read of the schema and CI setup, and a concrete
+next task (the profile page) queued up for Week 2.
+
+\end{document}
