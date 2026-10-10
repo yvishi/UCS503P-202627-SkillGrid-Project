@@ -29,18 +29,38 @@ export function GithubStep({
       onSkip={onSkip}
       onBack={onBack}
     >
-      <div className="flex flex-col items-start gap-3">
-        {username ? (
-          <TrustBadge>Connected as @{username}</TrustBadge>
-        ) : (
-          <ConnectGithubButton returnTo="/onboarding" />
-        )}
+      <div className="flex flex-col gap-4">
         {connectionError && (
-          <p className="text-xs text-danger">Something went wrong connecting GitHub. Please try again.</p>
+          <p role="alert" className="rounded-theme-md border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+            GitHub didn&apos;t connect. Try again, and approve access on GitHub&apos;s screen when it opens. You can
+            also skip this and connect later from your profile.
+          </p>
         )}
-        <p className="text-xs text-ink-muted">
-          We only read your public profile and repos — nothing is posted on your behalf.
-        </p>
+
+        <div
+          className={`flex flex-col gap-4 rounded-theme-md border p-4 sm:flex-row sm:items-center sm:justify-between ${
+            username ? "border-trust/30 bg-trust/[0.06]" : "border-border bg-surface-alt/40"
+          }`}
+        >
+          <div className="flex flex-col gap-1.5">
+            {username ? (
+              <>
+                <TrustBadge className="self-start">Connected as @{username}</TrustBadge>
+                <p className="text-sm text-ink-muted">Your repo languages will show up as evidence on your grid.</p>
+              </>
+            ) : (
+              <>
+                <TrustBadge pending className="self-start">
+                  Not connected
+                </TrustBadge>
+                <p className="text-sm text-ink-muted">You&apos;ll go to GitHub to approve, then come straight back here.</p>
+              </>
+            )}
+          </div>
+          {!username && <ConnectGithubButton returnTo="/onboarding" className="shrink-0" />}
+        </div>
+
+        <p className="text-xs text-ink-muted">We only read your public profile and repos. Nothing is posted on your behalf.</p>
       </div>
     </StepShell>
   );

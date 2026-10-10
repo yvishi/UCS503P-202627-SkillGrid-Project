@@ -1,7 +1,7 @@
 import type { GithubReturnTo } from "@/lib/github";
 
 import { ClearGithubQueryParam } from "./ClearGithubQueryParam";
-import { buttonBase } from "./primitives";
+import { buttonBase, primaryButtonClass, secondaryButtonClass } from "./primitives";
 
 // The one "Connect GitHub" trigger, reused by dashboard quick actions,
 // onboarding's GithubStep, and the profile page -- see app/api/github for
@@ -20,10 +20,7 @@ export function ConnectGithubButton({
   className?: string;
   children?: React.ReactNode;
 }) {
-  const variantClass =
-    variant === "primary"
-      ? "bg-trust text-surface shadow-sm hover:bg-trust-strong"
-      : "border border-border-strong text-ink hover:border-trust hover:text-trust";
+  const variantClass = variant === "primary" ? primaryButtonClass : secondaryButtonClass;
 
   return (
     <a
@@ -48,12 +45,12 @@ export function GithubConnectionBanner({ status }: { status: string | undefined 
     <>
       <ClearGithubQueryParam />
       {status === "connected" ? (
-        <p className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success-strong">
-          GitHub connected.
+        <p role="status" className="rounded-theme-md border border-trust/30 bg-trust/10 px-4 py-3 text-sm text-trust-strong">
+          GitHub connected. Your repositories now count as evidence.
         </p>
       ) : (
-        <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
-          Something went wrong connecting GitHub. Please try again.
+        <p role="alert" className="rounded-theme-md border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+          GitHub didn&apos;t connect. Try again, and approve access on GitHub&apos;s screen when it opens.
         </p>
       )}
     </>

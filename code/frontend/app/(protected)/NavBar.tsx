@@ -5,35 +5,45 @@ import { Avatar } from "@/app/ui/Avatar";
 import { SecondaryButton } from "@/app/ui/primitives";
 import { ThemeToggle } from "@/app/ui/ThemeToggle";
 
+import { NavLinks } from "./NavLinks";
+
+// 2x2 cell mark: three levels of evidence plus one empty cell, the grid
+// in miniature.
+function CellMark() {
+  return (
+    <span aria-hidden="true" className="grid grid-cols-2 gap-[2px]">
+      <span className="h-[7px] w-[7px] rounded-[2px] bg-cell-4" />
+      <span className="h-[7px] w-[7px] rounded-[2px] bg-cell-2" />
+      <span className="h-[7px] w-[7px] rounded-[2px] bg-cell-3" />
+      <span className="h-[7px] w-[7px] rounded-[2px] bg-cell-0" />
+    </span>
+  );
+}
+
 export async function NavBar() {
   const session = await auth();
   const user = session?.user;
+  const displayName = user?.name ?? user?.email ?? "You";
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-bg/90 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-3">
-        <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="font-display text-lg font-extrabold tracking-tight text-trust">
-            SkillGrid
+    <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+        <div className="flex items-center gap-5">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 rounded-theme-sm text-ink"
+            aria-label="SkillGrid, go to dashboard"
+          >
+            <CellMark />
+            <span className="font-display text-base font-bold tracking-tight">SkillGrid</span>
           </Link>
-          <nav className="font-display flex items-center gap-5 text-sm font-medium text-ink-muted">
-            <Link href="/dashboard" className="transition hover:text-ink">
-              Dashboard
-            </Link>
-            <Link href="/profile" className="transition hover:text-ink">
-              Profile
-            </Link>
-          </nav>
+          <NavLinks className="hidden sm:block" />
         </div>
 
         {user && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
-            <Avatar
-              name={user.name ?? user.email ?? "You"}
-              image={user.image ?? null}
-              size="h-8 w-8 text-xs"
-            />
+            <Avatar name={displayName} image={user.image ?? null} size="h-8 w-8 text-xs" />
             <form
               action={async () => {
                 "use server";
@@ -46,6 +56,11 @@ export async function NavBar() {
             </form>
           </div>
         )}
+      </div>
+
+      {/* Mobile: links get their own row so nothing has to squeeze at 375px. */}
+      <div className="border-t border-border px-2 py-1 sm:hidden">
+        <NavLinks />
       </div>
     </header>
   );

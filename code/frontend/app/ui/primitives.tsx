@@ -1,45 +1,89 @@
 // Shared visual primitives for SkillGrid. Used by both the public
 // (landing) and protected (dashboard/profile/onboarding) surfaces, which
 // is why this lives outside the (protected) route group.
+//
+// Visual language: graph paper + evidence cells. Anything "backed by
+// evidence" is drawn as a filled ultramarine square (the same cell as the
+// EvidenceGrid signature); anything empty/pending is an outlined cell.
 
-export function Eyebrow({ children }: { children: React.ReactNode }) {
+export function Eyebrow({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <span className="font-display inline-block text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+    <span
+      className={`inline-block font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-muted ${className}`}
+    >
       {children}
     </span>
   );
+}
+
+export function Cell({
+  level = 0,
+  className = "",
+}: {
+  level?: 0 | 1 | 2 | 3 | 4;
+  className?: string;
+}) {
+  const bg = ["bg-cell-0", "bg-cell-1", "bg-cell-2", "bg-cell-3", "bg-cell-4"][level];
+  return <span aria-hidden="true" className={`inline-block h-3 w-3 shrink-0 rounded-[3px] ${bg} ${className}`} />;
 }
 
 export function SectionCard({
   title,
   action,
   children,
+  className = "",
 }: {
   title: string;
   action?: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <section className={`rounded-theme-lg border border-border bg-surface ${className}`}>
+      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
         <Eyebrow>{title}</Eyebrow>
         {action}
       </div>
-      {children}
-    </div>
+      <div className="p-5">{children}</div>
+    </section>
   );
 }
 
-export function Pill({ children }: { children: React.ReactNode }) {
+export function Pill({
+  children,
+  tone = "neutral",
+}: {
+  children: React.ReactNode;
+  tone?: "neutral" | "trust" | "warm";
+}) {
+  const toneClass =
+    tone === "trust"
+      ? "border-trust/25 bg-trust/10 text-trust-strong"
+      : tone === "warm"
+        ? "border-warm/30 bg-warm/10 text-warm-strong"
+        : "border-border bg-surface-alt text-ink";
   return (
-    <span className="font-display inline-block rounded-full border border-border-strong bg-surface-alt px-3 py-1 text-xs font-medium">
+    <span
+      className={`inline-flex items-center rounded-theme-sm border px-2 py-0.5 text-xs font-medium ${toneClass}`}
+    >
       {children}
     </span>
   );
 }
 
 export function Empty({ message }: { message: string }) {
-  return <p className="text-sm text-ink-muted">{message}</p>;
+  return (
+    <p className="flex items-center gap-2 text-sm text-ink-muted">
+      <span aria-hidden="true" className="inline-block h-3 w-3 rounded-[3px] border border-dashed border-border-strong" />
+      {message}
+    </p>
+  );
 }
 
 export function EvidenceRow({
@@ -54,35 +98,59 @@ export function EvidenceRow({
   return (
     <li
       className={`flex items-center gap-3 text-sm ${
-        done ? "" : disabled ? "text-ink-muted/60" : "text-ink-muted"
+        done ? "text-ink" : disabled ? "text-ink-muted/60" : "text-ink-muted"
       }`}
     >
       <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-          done ? "bg-success text-surface" : "border border-border-strong"
+        aria-hidden="true"
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] ${
+          done
+            ? "bg-trust text-on-trust"
+            : disabled
+              ? "border border-dashed border-border-strong"
+              : "border border-border-strong"
         }`}
       >
-        {done ? "✓" : "–"}
+        {done && (
+          <svg viewBox="0 0 20 20" className="h-3 w-3" fill="currentColor">
+            <path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.8 6.8-6.8a1 1 0 0 1 1.4 0Z" />
+          </svg>
+        )}
       </span>
       {children}
     </li>
   );
 }
 
-export function ProgressBar({ fraction }: { fraction: number }) {
-  const pct = Math.round(Math.min(1, Math.max(0, fraction)) * 100);
+// Drawn as a row of grid cells rather than a smooth bar, so progress reads
+// in the same unit as the evidence grid.
+export function ProgressBar({
+  fraction,
+  cells = 10,
+}: {
+  fraction: number;
+  cells?: number;
+}) {
+  const clamped = Math.min(1, Math.max(0, fraction));
+  const pct = Math.round(clamped * 100);
+  const filled = Math.round(clamped * cells);
   return (
     <div
-      className="h-2 w-full overflow-hidden rounded-full bg-surface-alt"
+      className="flex w-full gap-[3px]"
       role="progressbar"
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <div
-        className="h-full rounded-full bg-success transition-all"
-        style={{ width: `${pct}%` }}
-      />
+      {Array.from({ length: cells }, (_, i) => (
+        <span
+          key={i}
+          className={`h-2 flex-1 rounded-[2px] transition-colors duration-500 ${
+            i < filled ? "bg-trust" : "bg-cell-0"
+          }`}
+          style={{ transitionDelay: `${i * 40}ms` }}
+        />
+      ))}
     </div>
   );
 }
@@ -93,25 +161,22 @@ export function StatCard({
   hint,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   hint?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+    <div className="rounded-theme-lg border border-border bg-surface p-5">
       <Eyebrow>{label}</Eyebrow>
-      <p className="font-display mt-2 text-2xl font-bold tracking-tight">{value}</p>
-      {hint && <p className="mt-1 text-sm text-ink-muted">{hint}</p>}
+      <p className="font-display mt-3 text-4xl font-bold leading-none tracking-tight tabular-nums">{value}</p>
+      {hint && <p className="mt-2 truncate text-sm text-ink-muted">{hint}</p>}
     </div>
   );
 }
 
 /**
- * The signature element: a warm, rounded badge for anything that counts
- * as verified evidence (resume on file, GitHub connected, etc). A soft
- * tinted pill with a checkmark reads as reassuring rather than
- * bureaucratic -- literalizing "trust" without feeling like paperwork.
- * `pending` renders a neutral outline for evidence submitted but not yet
- * verified.
+ * Marks anything that counts as verified evidence (resume on file, GitHub
+ * connected, etc). The leading filled cell ties it to the evidence grid;
+ * `pending` renders an outlined cell for evidence not yet verified.
  */
 export function TrustBadge({
   children,
@@ -124,47 +189,42 @@ export function TrustBadge({
 }) {
   return (
     <span
-      className={`font-display inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+      className={`inline-flex items-center gap-2 rounded-theme-sm border px-2.5 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.08em] ${
         pending
-          ? "border border-border-strong text-ink-muted"
-          : "bg-success/15 text-success-strong"
+          ? "border-border-strong text-ink-muted"
+          : "border-trust/25 bg-trust/10 text-trust-strong"
       } ${className}`}
     >
-      {!pending && (
-        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
-          <path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.8 6.8-6.8a1 1 0 0 1 1.4 0Z" />
-        </svg>
-      )}
+      <span
+        aria-hidden="true"
+        className={`h-2.5 w-2.5 rounded-[2px] ${pending ? "border border-dashed border-ink-muted" : "bg-trust"}`}
+      />
       {children}
     </span>
   );
 }
 
 export const buttonBase =
-  "font-display inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex items-center justify-center gap-2 rounded-theme-md px-4 py-2.5 text-sm font-semibold transition duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40 disabled:active:translate-y-0";
+
+export const primaryButtonClass =
+  "bg-trust text-on-trust shadow-[inset_0_-2px_0_rgba(0,0,0,0.18)] hover:bg-trust-strong";
+
+export const secondaryButtonClass =
+  "border border-border-strong bg-surface text-ink hover:border-ink hover:bg-surface-alt";
 
 export function PrimaryButton({
   className = "",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      {...props}
-      className={`${buttonBase} bg-trust text-surface shadow-sm hover:bg-trust-strong ${className}`}
-    />
-  );
+  return <button {...props} className={`${buttonBase} ${primaryButtonClass} ${className}`} />;
 }
 
 export function SecondaryButton({
   className = "",
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      {...props}
-      className={`${buttonBase} border border-border-strong text-ink hover:border-trust hover:text-trust ${className}`}
-    />
-  );
+  return <button {...props} className={`${buttonBase} ${secondaryButtonClass} ${className}`} />;
 }
 
 export function GoogleIcon() {
