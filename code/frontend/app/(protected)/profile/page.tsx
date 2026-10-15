@@ -115,11 +115,19 @@ export default async function ProfilePage({
             <h2 id="skills-heading">
               <Eyebrow>Skills × evidence</Eyebrow>
             </h2>
-            {grid.rows.length > 0 && (
-              <span className="font-mono text-xs text-ink-muted tabular-nums">
-                {grid.backedCount} of {grid.rows.length} backed by evidence
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {grid.rows.length > 0 && (
+                <span className="font-mono text-xs text-ink-muted tabular-nums">
+                  {grid.backedCount} of {grid.rows.length} backed by evidence
+                </span>
+              )}
+              <Link
+                href="/profile/skills"
+                className="rounded-theme-sm text-xs font-semibold text-trust underline underline-offset-4 hover:text-trust-strong"
+              >
+                Edit skills
+              </Link>
+            </div>
           </div>
           <div className="bg-graph p-5 sm:p-6">
             {grid.rows.length > 0 ? (
@@ -131,7 +139,7 @@ export default async function ProfilePage({
                 caption="Your skills against each evidence source: self-rating, resume, GitHub and peers"
               />
             ) : (
-              <Empty message="No skills yet. Upload a resume or connect GitHub and they'll appear here." />
+              <Empty message="No skills yet. Add some, upload a resume or connect GitHub and they'll appear here." />
             )}
           </div>
           <div className="flex flex-col gap-2 border-t border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
