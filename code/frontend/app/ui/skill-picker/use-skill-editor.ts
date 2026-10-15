@@ -27,7 +27,10 @@ export function useSkillEditor(initial: SkillEditorState, onChange?: (state: Ski
   const [state, setState] = useState(initial);
   const stateRef = useRef(initial);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
+  // Counted, not a flag: two in-flight requests on one id must both finish
+  // before its row is enabled again.
+  const [busyCounts, setBusyCounts] = useState<ReadonlyMap<string, number>>(new Map());
+  const busy: ReadonlySet<string> = new Set(busyCounts.keys());
 
   function commit(update: (prev: SkillEditorState) => SkillEditorState) {
     const next = update(stateRef.current);
@@ -37,9 +40,10 @@ export function useSkillEditor(initial: SkillEditorState, onChange?: (state: Ski
   }
 
   function markBusy(id: string, on: boolean) {
-    setBusy((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(id);
+    setBusyCounts((prev) => {
+      const next = new Map(prev);
+      const count = (next.get(id) ?? 0) + (on ? 1 : -1);
+      if (count > 0) next.set(id, count);
       else next.delete(id);
       return next;
     });
@@ -66,7 +70,8 @@ export function useSkillEditor(initial: SkillEditorState, onChange?: (state: Ski
       error: GENERIC_ERROR,
     });
     if (res.ok) {
-      commit((s) => ({ ...s, skills: s.skills.map((x) => (x.slug === skill.slug ? res.skill : x)) }));
+      // Keep the local level: the user may have changed it while the add was in flight.
+      commit((s) => ({ ...s, skills: s.skills.map((x) => (x.slug === skill.slug ? { ...res.skill, level: x.level } : x)) }));
     } else {
       commit((s) => ({ ...s, skills: s.skills.filter((x) => x.slug !== skill.slug) }));
       setError(res.error);
@@ -84,7 +89,8 @@ export function useSkillEditor(initial: SkillEditorState, onChange?: (state: Ski
     commit((s) => ({ ...s, skills: s.skills.map((x) => (x.slug === slug ? { ...x, level } : x)) }));
     const res = await guarded(slug, () => setUserSkillLevelAction(slug, level), { ok: false as const, error: GENERIC_ERROR });
     if (!res.ok) {
-      commit((s) => ({ ...s, skills: s.skills.map((x) => (x.slug === slug ? previous : x)) }));
+      // Only undo our own change; a newer setLevel may have superseded it.
+      commit((s) => ({ ...s, skills: s.skills.map((x) => (x.slug === slug && x.level === level ? previous : x)) }));
       setError(res.error);
     }
   }
@@ -98,6 +104,7 @@ export function useSkillEditor(initial: SkillEditorState, onChange?: (state: Ski
     const res = await guarded(slug, () => removeUserSkillAction(slug), { ok: false as const, error: GENERIC_ERROR });
     if (!res.ok) {
       commit((s) => {
+        if (s.skills.some((x) => x.slug === slug)) return s;
         const skills = [...s.skills];
         skills.splice(Math.min(index, skills.length), 0, previous);
         return { ...s, skills };
@@ -134,6 +141,7 @@ export function useSkillEditor(initial: SkillEditorState, onChange?: (state: Ski
     const res = await guarded(id, () => cancelReportAction(id), { ok: false });
     if (!res.ok) {
       commit((s) => {
+        if (s.reports.some((r) => r.id === id)) return s;
         const reports = [...s.reports];
         reports.splice(Math.min(index, reports.length), 0, previous);
         return { ...s, reports };

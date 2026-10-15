@@ -92,6 +92,7 @@ export function SkillRatingRow({
                 type="button"
                 role="radio"
                 aria-checked={checked}
+                disabled={busy}
                 aria-label={SKILL_RATING_LABELS[lvl]}
                 title={SKILL_RATING_LABELS[lvl]}
                 tabIndex={checked ? 0 : -1}
