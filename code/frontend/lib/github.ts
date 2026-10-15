@@ -1,4 +1,14 @@
-import { mapGithubLanguageToSkill, type SkillSlug } from "@/lib/skills";
+import {
+  countTopics,
+  githubSkillLevels,
+  qualifyLanguages,
+  recentRepos,
+  type GithubSkill,
+  type RepoLanguageBytes,
+  type RepoSummary,
+} from "@/lib/github-skills";
+import { findInCatalog } from "@/lib/skill-catalog-core";
+import { getCatalog, resolveGithubLanguage } from "@/lib/skill-catalog";
 
 // GitHub is connected as a per-user EVIDENCE source (see app/api/github),
 // not a NextAuth sign-in provider -- see auth.ts. This module holds the
@@ -99,16 +109,15 @@ export async function fetchGithubUser(accessToken: string): Promise<GithubUser> 
   return { login: data.login, name: data.name, avatarUrl: data.avatar_url };
 }
 
-const MAX_REPOS_SCANNED = 100;
+const MAX_REPOS_LISTED = 100;
+const LANGUAGE_FETCH_CONCURRENCY = 5;
 
-// One primary language per repo (GitHub's own `language` field, not a full
-// byte-count breakdown -- that would need one extra API call per repo).
-// Forks are excluded so a starred/forked repo doesn't misrepresent the
-// user's own work. Returns language names with repeats, so callers can
-// rank by how often each one shows up.
-export async function fetchPublicRepoLanguages(username: string, accessToken: string): Promise<string[]> {
+// The user's own (non-fork) public repos. Forks are excluded so a forked
+// repo doesn't misrepresent the user's own work. `topics` comes back in
+// this listing for free.
+export async function fetchOwnedRepos(username: string, accessToken: string): Promise<RepoSummary[]> {
   const url = new URL(`https://api.github.com/users/${encodeURIComponent(username)}/repos`);
-  url.searchParams.set("per_page", String(MAX_REPOS_SCANNED));
+  url.searchParams.set("per_page", String(MAX_REPOS_LISTED));
   url.searchParams.set("type", "owner");
   url.searchParams.set("sort", "pushed");
 
@@ -116,37 +125,82 @@ export async function fetchPublicRepoLanguages(username: string, accessToken: st
   if (!res.ok) {
     throw new Error(`GitHub repo listing failed with status ${res.status}`);
   }
-  const repos = (await res.json()) as { language: string | null; fork: boolean }[];
-  return repos.filter((r) => !r.fork && r.language).map((r) => r.language as string);
+  const repos = (await res.json()) as { name: string; fork: boolean; pushed_at: string | null; topics?: string[] }[];
+  return repos
+    .filter((r) => !r.fork)
+    .map((r) => ({ name: r.name, pushedAt: r.pushed_at ?? "", topics: r.topics ?? [] }));
 }
 
-// Ranks by frequency (most-used language first) and maps to the fixed
-// skill list (lib/skills.ts) -- languages with no corresponding skill slug
-// (e.g. "HTML", "Shell") are dropped rather than left unmapped.
-export function deriveSkillsFromLanguages(languageNames: string[]): SkillSlug[] {
-  const counts = new Map<string, number>();
-  for (const name of languageNames) {
-    counts.set(name, (counts.get(name) ?? 0) + 1);
+/** Bytes of code per language in one repo (every language, not just the primary one). */
+export async function fetchRepoLanguages(owner: string, repo: string, accessToken: string): Promise<RepoLanguageBytes> {
+  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/languages`;
+  const res = await fetch(url, { headers: githubApiHeaders(accessToken) });
+  if (!res.ok) {
+    throw new Error(`GitHub languages for ${repo} failed with status ${res.status}`);
   }
-  const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+  return (await res.json()) as RepoLanguageBytes;
+}
 
-  const slugs: SkillSlug[] = [];
-  for (const name of ranked) {
-    const slug = mapGithubLanguageToSkill(name);
-    if (slug && !slugs.includes(slug)) {
-      slugs.push(slug);
+// Runs fn over items, `limit` at a time. A failure skips that item (null)
+// instead of failing the whole scan -- one private-turned or rate-limited
+// repo shouldn't block connecting GitHub.
+async function mapSettled<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<(R | null)[]> {
+  const results: (R | null)[] = new Array(items.length).fill(null);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      try {
+        results[i] = await fn(items[i]);
+      } catch (err) {
+        console.error("GitHub scan skipped a repo:", err);
+      }
     }
   }
-  return slugs;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
-// EvidenceRecord.payload shape for source: "GITHUB" (see prisma/schema.prisma).
+/**
+ * Languages (by bytes, across the 30 most recently pushed repos) and topics
+ * (across all owned repos) -> scored skills. Languages may add catalog
+ * entries (resolveGithubLanguage); topics only count when they match one.
+ */
+export async function scanGithubSkills(
+  username: string,
+  accessToken: string,
+): Promise<{ skills: GithubSkill[]; reposScanned: number }> {
+  const repos = await fetchOwnedRepos(username, accessToken);
+  const recent = recentRepos(repos);
+  const perRepo = (
+    await mapSettled(recent, LANGUAGE_FETCH_CONCURRENCY, (r) => fetchRepoLanguages(username, r.name, accessToken))
+  ).filter((bytes): bytes is RepoLanguageBytes => bytes !== null);
+
+  const languages: (ReturnType<typeof qualifyLanguages>[number] & { slug: string })[] = [];
+  for (const stat of qualifyLanguages(perRepo)) {
+    const skill = await resolveGithubLanguage(stat.language);
+    languages.push({ ...stat, slug: skill.slug });
+  }
+
+  const catalog = await getCatalog();
+  const topics: { slug: string; repos: number }[] = [];
+  for (const [topic, count] of countTopics(repos)) {
+    const skill = findInCatalog(catalog, topic);
+    if (skill) topics.push({ slug: skill.slug, repos: count });
+  }
+
+  return { skills: githubSkillLevels({ languages, topics }), reposScanned: recent.length };
+}
+
+// EvidenceRecord.payload shape for source: "GITHUB" (spec 4.1). v1 payloads
+// (languages: slug[]) are still read by lib/skill-grid.ts.
 export type GithubEvidencePayload = {
+  version: 2;
   username: string;
   name: string | null;
   avatarUrl: string | null;
   verified: true;
   connectedAt: string;
-  languages: SkillSlug[];
-  repoCount: number;
+  reposScanned: number;
+  skills: GithubSkill[];
 };

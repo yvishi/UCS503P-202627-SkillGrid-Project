@@ -2,21 +2,19 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { mergeSkillRatings, parseSkillRatings } from "@/lib/skills";
 import {
   OAUTH_RETURN_TO_COOKIE,
   OAUTH_STATE_COOKIE,
-  deriveSkillsFromLanguages,
   exchangeCodeForToken,
   fetchGithubUser,
-  fetchPublicRepoLanguages,
+  scanGithubSkills,
   sanitizeReturnTo,
   type GithubEvidencePayload,
 } from "@/lib/github";
 
 // GET /api/github/callback -- GitHub redirects here after consent, with
 // ?code&state (or ?error on denial). Exchanges the code for a token
-// server-side, pulls public repo languages, and saves one GITHUB
+// server-side, scans public repo languages and topics, and saves one GITHUB
 // EvidenceRecord (replacing any previous connection -- a user has exactly
 // one GitHub account, unlike resumes, which keep history). Then redirects
 // back to wherever "Connect GitHub" was clicked from.
@@ -53,36 +51,30 @@ export async function GET(request: NextRequest) {
   try {
     const accessToken = await exchangeCodeForToken(code);
     const githubUser = await fetchGithubUser(accessToken);
-    const languageNames = await fetchPublicRepoLanguages(githubUser.login, accessToken);
-    const languages = deriveSkillsFromLanguages(languageNames);
+    const { skills, reposScanned } = await scanGithubSkills(githubUser.login, accessToken);
 
     const payload: GithubEvidencePayload = {
+      version: 2,
       username: githubUser.login,
       name: githubUser.name,
       avatarUrl: githubUser.avatarUrl,
       verified: true,
       connectedAt: new Date().toISOString(),
-      languages,
-      repoCount: languageNames.length,
+      reposScanned,
+      skills,
     };
 
+    // Detected skills are evidence and picker suggestions only -- they no
+    // longer touch self-ratings, so there's no read-merge-write race left.
     const record = await prisma.$transaction(async (tx) => {
-      // Read-then-merge-then-write on skillRatings, so this must read the
-      // current profile inside the same transaction it writes in -- reading
-      // outside would let a concurrent connect (two tabs, or a race with
-      // onboarding's own profile write) read the same stale skillRatings
-      // and clobber whichever write commits second.
-      const profile = await tx.profile.findUnique({ where: { userId } });
-      const mergedSkillRatings = mergeSkillRatings(parseSkillRatings(profile?.skillRatings), languages);
-
       // Replace rather than accumulate -- one connected GitHub account per
       // user (also clears out the old unverified-URL placeholder record).
       await tx.evidenceRecord.deleteMany({ where: { userId, source: "GITHUB" } });
       const created = await tx.evidenceRecord.create({ data: { userId, source: "GITHUB", payload } });
       await tx.profile.upsert({
         where: { userId },
-        create: { userId, githubUsername: githubUser.login, skillRatings: mergedSkillRatings },
-        update: { githubUsername: githubUser.login, skillRatings: mergedSkillRatings },
+        create: { userId, githubUsername: githubUser.login },
+        update: { githubUsername: githubUser.login },
       });
       return created;
     });

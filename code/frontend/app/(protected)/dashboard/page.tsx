@@ -172,8 +172,8 @@ export default async function DashboardPage({
                 <SourceNote name="GitHub" swatch={grid.github && grid.github.skillCount > 0 ? "evidence" : "empty"}>
                   {grid.github
                     ? grid.github.skillCount > 0
-                      ? `${grid.github.skillCount} ${grid.github.skillCount === 1 ? "language" : "languages"} from @${grid.github.username}'s public repos.`
-                      : `Connected as @${grid.github.username}. No repo languages match the skill list yet.`
+                      ? `${grid.github.skillCount} ${grid.github.skillCount === 1 ? "skill" : "skills"} from @${grid.github.username}'s public repos.`
+                      : `Connected as @${grid.github.username}. No skills detected in the public repos yet.`
                     : "Not connected yet. Connect it under quick actions."}
                 </SourceNote>
                 <SourceNote name="Peers" swatch="empty">

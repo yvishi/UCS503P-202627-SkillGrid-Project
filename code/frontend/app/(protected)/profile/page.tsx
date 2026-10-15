@@ -66,7 +66,8 @@ export default async function ProfilePage({
   const image = session.user?.image ?? null;
 
   const resumeFilename = (resumeRecord?.payload as { filename?: string } | undefined)?.filename ?? "resume.pdf";
-  const githubPayload = githubRecord?.payload as { repoCount?: number } | undefined;
+  const githubPayload = githubRecord?.payload as { repoCount?: number; reposScanned?: number } | undefined;
+  const reposScanned = githubPayload?.reposScanned ?? githubPayload?.repoCount;
   const githubSkillCount = githubSkillsFromPayload(githubRecord?.payload).length;
 
   return (
@@ -242,12 +243,12 @@ export default async function ProfilePage({
               githubConnected ? (
                 <span className="font-mono">
                   {profile.githubUsername && <span className="text-ink">@{profile.githubUsername}</span>}
-                  {typeof githubPayload?.repoCount === "number" &&
-                    ` · ${githubPayload.repoCount} ${githubPayload.repoCount === 1 ? "repo" : "repos"} scanned`}
+                  {typeof reposScanned === "number" &&
+                    ` · ${reposScanned} ${reposScanned === 1 ? "repo" : "repos"} scanned`}
                   {` · ${githubSkillCount} ${githubSkillCount === 1 ? "skill" : "skills"} matched`}
                 </span>
               ) : (
-                "Connect GitHub and the languages in your own repositories count as evidence."
+                "Connect GitHub and the languages and topics in your own repositories count as evidence."
               )
             }
             action={
