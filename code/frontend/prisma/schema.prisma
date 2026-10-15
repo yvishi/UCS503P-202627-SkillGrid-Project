@@ -89,9 +89,9 @@ model Profile {
   availability          Availability?
   projectLinks          String[]      @default([])
 
-  // Per-skill self-assessment from onboarding v2 (skill slug -> ComfortLevel),
-  // e.g. {"react": "INTERMEDIATE", "docker": "BEGINNER"}. Additive to the
-  // single `comfortLevel` field above, which older screens still read.
+  // DEPRECATED -- copied into user_skills by the open_skill_catalog
+  // migration and no longer read or written. Drop it once
+  // prisma/scripts/verify-skill-migration.ts has passed on production.
   skillRatings Json @default("{}")
 
   // Which RESUME EvidenceRecord.id is "current" (see app/(protected)/profile/resume) --
