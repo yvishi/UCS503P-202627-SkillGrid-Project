@@ -39,19 +39,20 @@ export default async function ResumePage() {
   });
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
-      <div>
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10 sm:px-6 sm:py-12">
+      <header className="border-b border-border pb-6">
         <Link
-          href="/dashboard"
-          className="font-display text-sm font-medium text-ink-muted transition hover:text-trust"
+          href="/profile"
+          className="rounded-theme-sm font-mono text-xs uppercase tracking-[0.12em] text-ink-muted transition hover:text-trust focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-trust"
         >
-          ← Dashboard
+          ← Profile
         </Link>
-        <h1 className="font-display mt-3 text-2xl font-bold tracking-tight">Resumes</h1>
-        <p className="mt-1 text-sm text-ink-muted">
-          Upload a new resume to update your skills, or switch back to one you&apos;ve used before.
+        <h1 className="font-display mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Resumes</h1>
+        <p className="mt-2 max-w-prose text-sm text-ink-muted">
+          The current resume is the one your skill evidence is read from. Upload a new one, or switch back to
+          one you&apos;ve used before.
         </p>
-      </div>
+      </header>
 
       <ResumeManager resumes={resumes} />
     </main>

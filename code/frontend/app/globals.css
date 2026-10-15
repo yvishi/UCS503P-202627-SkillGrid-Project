@@ -1,34 +1,43 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------
- * SkillGrid theme tokens -- "warm trust": a soft ivory surface, a deep
- * teal accent (trust) and a warm coral accent (warmth), rounded geometry
- * throughout. Supports three states: explicit light, explicit dark, and
- * "system" (no override -- follows prefers-color-scheme). See
- * ThemeToggle in app/ui/ThemeToggle.tsx for how data-theme gets set.
+ * SkillGrid theme -- "graph paper": cool ruled-paper surfaces, carbon
+ * ink, ultramarine for anything backed by evidence and signal amber for
+ * anything only self-reported or still pending. The evidence grid
+ * (app/ui/EvidenceGrid.tsx) is the signature; --cell-0..4 is its heat
+ * scale. Token names predate the redesign and are kept stable:
+ * `trust` = ultramarine (verified), `warm` = amber (self-reported).
  * ------------------------------------------------------------------- */
 :root {
-  --bg: #fbf6ef;
-  --surface: #ffffff;
-  --surface-alt: #fdf8f1;
-  --ink: #2b2622;
-  --ink-muted: #7a7167;
-  --border: #eae0d2;
-  --border-strong: #d8cbb8;
+  --bg: #eef0f5;
+  --surface: #fbfbfd;
+  --surface-alt: #e5e8f0;
+  --ink: #12131c;
+  --ink-muted: #5d6175;
+  --border: #dadde7;
+  --border-strong: #c3c7d6;
+  --rule: rgba(18, 19, 28, 0.055);
 
-  --trust: #2f6f6b;
-  --trust-strong: #1f4f4c;
-  --warm: #e8935b;
-  --warm-strong: #c96f3a;
-  --success: #4c9a6a;
-  --success-strong: #35754c;
-  --danger: #c1502e;
-  --gold: #b98a1f;
-  --gold-strong: #8f6b17;
+  --trust: #3b2ef0;
+  --trust-strong: #2a1fc4;
+  --warm: #e89a0c;
+  --warm-strong: #a86d00;
+  --success: #3b2ef0;
+  --success-strong: #2a1fc4;
+  --danger: #d93a2b;
+  --gold: #e89a0c;
+  --gold-strong: #a86d00;
+  --on-trust: #ffffff;
 
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  --cell-0: #e1e4ed;
+  --cell-1: #c9c5fb;
+  --cell-2: #9089f7;
+  --cell-3: #5a4ff3;
+  --cell-4: #3b2ef0;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
 
 @theme inline {
@@ -48,8 +57,15 @@
   --color-danger: var(--danger);
   --color-gold: var(--gold);
   --color-gold-strong: var(--gold-strong);
-  --font-display: var(--font-jakarta);
-  --font-sans: var(--font-jakarta);
+  --color-on-trust: var(--on-trust);
+  --color-cell-0: var(--cell-0);
+  --color-cell-1: var(--cell-1);
+  --color-cell-2: var(--cell-2);
+  --color-cell-3: var(--cell-3);
+  --color-cell-4: var(--cell-4);
+  --font-display: var(--font-bricolage);
+  --font-sans: var(--font-schibsted);
+  --font-mono: var(--font-jetbrains);
   --radius-theme-sm: var(--radius-sm);
   --radius-theme-md: var(--radius-md);
   --radius-theme-lg: var(--radius-lg);
@@ -57,52 +73,99 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #201c18;
-    --surface: #2a2521;
-    --surface-alt: #322c26;
-    --ink: #f2ede4;
-    --ink-muted: #a99f92;
-    --border: #3e362e;
-    --border-strong: #4c4238;
+    --bg: #0b0c14;
+    --surface: #13141f;
+    --surface-alt: #1b1d2b;
+    --ink: #ecedf4;
+    --ink-muted: #8b8fa6;
+    --border: #252738;
+    --border-strong: #353849;
+    --rule: rgba(236, 237, 244, 0.04);
 
-    --trust: #6fbfb8;
-    --trust-strong: #8ed2cb;
-    --warm: #f2a874;
-    --warm-strong: #f7be94;
-    --success: #7ecb9b;
-    --success-strong: #98d9b1;
-    --danger: #e0895f;
-    --gold: #d9b25a;
-    --gold-strong: #ecc978;
+    --trust: #7c73ff;
+    --trust-strong: #a39dff;
+    --warm: #f5b83d;
+    --warm-strong: #f8c96a;
+    --success: #7c73ff;
+    --success-strong: #a39dff;
+    --danger: #ff6b5c;
+    --gold: #f5b83d;
+    --gold-strong: #f8c96a;
+    --on-trust: #0b0c14;
+
+    --cell-0: #1d1f2e;
+    --cell-1: #2e2a6b;
+    --cell-2: #4840b0;
+    --cell-3: #6359e8;
+    --cell-4: #8c84ff;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #201c18;
-  --surface: #2a2521;
-  --surface-alt: #322c26;
-  --ink: #f2ede4;
-  --ink-muted: #a99f92;
-  --border: #3e362e;
-  --border-strong: #4c4238;
+  --bg: #0b0c14;
+  --surface: #13141f;
+  --surface-alt: #1b1d2b;
+  --ink: #ecedf4;
+  --ink-muted: #8b8fa6;
+  --border: #252738;
+  --border-strong: #353849;
+  --rule: rgba(236, 237, 244, 0.04);
 
-  --trust: #6fbfb8;
-  --trust-strong: #8ed2cb;
-  --warm: #f2a874;
-  --warm-strong: #f7be94;
-  --success: #7ecb9b;
-  --success-strong: #98d9b1;
-  --danger: #e0895f;
-  --gold: #d9b25a;
-  --gold-strong: #ecc978;
+  --trust: #7c73ff;
+  --trust-strong: #a39dff;
+  --warm: #f5b83d;
+  --warm-strong: #f8c96a;
+  --success: #7c73ff;
+  --success-strong: #a39dff;
+  --danger: #ff6b5c;
+  --gold: #f5b83d;
+  --gold-strong: #f8c96a;
+  --on-trust: #0b0c14;
+
+  --cell-0: #1d1f2e;
+  --cell-1: #2e2a6b;
+  --cell-2: #4840b0;
+  --cell-3: #6359e8;
+  --cell-4: #8c84ff;
 }
 
 body {
   background-color: var(--bg);
   color: var(--ink);
-  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
 }
 
 .font-display {
-  font-family: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  font-optical-sizing: auto;
+}
+
+/* Faint graph-paper ruling for page grounds -- one 24px square per cell
+ * of the evidence grid, so the backdrop and the signature share a unit. */
+.bg-graph {
+  background-image:
+    linear-gradient(var(--rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--trust) 25%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--trust);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

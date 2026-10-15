@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import type { AvailabilityOption } from "@/lib/onboarding-options";
 import type { SkillRatings, SkillSlug } from "@/lib/skills";
@@ -103,6 +104,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
 
   // Strip the OAuth callback's query params so a refresh doesn't re-apply
   // them. Doesn't call setState -- this is a real side effect (URL), not
@@ -173,94 +175,111 @@ export function OnboardingWizard({ userId }: { userId: string }) {
     }
   }
 
-  if (!state.path) {
-    return <BranchStep onChoose={(path) => patch({ path })} />;
-  }
+  // Each screen fades/slides in on its own key; the branch screen counts as
+  // one too, so choosing a path transitions like any other step.
+  const viewKey = state.path ? `${state.path}:${currentKey}` : "branch";
+  const offset = reduceMotion ? 0 : 10;
 
   return (
     <div>
-      <Stepper steps={steps} current={currentKey} />
+      {state.path && <Stepper steps={steps} current={currentKey} />}
 
-      {currentKey === "resume" && (
-        <ResumeStep
-          onPassed={({ fileUrl, evidenceId, extractedSkills, usedOcr }) => {
-            patch({
-              resumeFileUrl: fileUrl,
-              resumeEvidenceId: evidenceId,
-              resumeSkills: extractedSkills,
-              resumeUsedOcr: usedOcr,
-            });
-            next();
-          }}
-          onSwitchToManual={() => patch({ path: "B", stepIndex: 0 })}
-        />
-      )}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={viewKey}
+          initial={{ opacity: 0, y: offset }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -offset }}
+          transition={{ duration: reduceMotion ? 0.12 : 0.22, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {!state.path ? (
+            <BranchStep onChoose={(path) => patch({ path })} />
+          ) : (
+            <>
+              {currentKey === "resume" && (
+                <ResumeStep
+                  onPassed={({ fileUrl, evidenceId, extractedSkills, usedOcr }) => {
+                    patch({
+                      resumeFileUrl: fileUrl,
+                      resumeEvidenceId: evidenceId,
+                      resumeSkills: extractedSkills,
+                      resumeUsedOcr: usedOcr,
+                    });
+                    next();
+                  }}
+                  onSwitchToManual={() => patch({ path: "B", stepIndex: 0 })}
+                />
+              )}
 
-      {currentKey === "skills" && (
-        <SkillsStep
-          value={state.skillRatings}
-          onChange={(skillRatings) => patch({ skillRatings })}
-          onContinue={next}
-          onBack={state.path === "A" ? back : undefined}
-        />
-      )}
+              {currentKey === "skills" && (
+                <SkillsStep
+                  value={state.skillRatings}
+                  onChange={(skillRatings) => patch({ skillRatings })}
+                  onContinue={next}
+                  onBack={state.path === "A" ? back : undefined}
+                />
+              )}
 
-      {currentKey === "interests" && (
-        <InterestsStep
-          value={state.interestTags}
-          onChange={(interestTags) => patch({ interestTags })}
-          onContinue={next}
-          onBack={back}
-        />
-      )}
+              {currentKey === "interests" && (
+                <InterestsStep
+                  value={state.interestTags}
+                  onChange={(interestTags) => patch({ interestTags })}
+                  onContinue={next}
+                  onBack={back}
+                />
+              )}
 
-      {currentKey === "availability" && (
-        <AvailabilityStep
-          value={state.availability}
-          onChange={(availability) => patch({ availability })}
-          onContinue={next}
-          onBack={back}
-        />
-      )}
+              {currentKey === "availability" && (
+                <AvailabilityStep
+                  value={state.availability}
+                  onChange={(availability) => patch({ availability })}
+                  onContinue={next}
+                  onBack={back}
+                />
+              )}
 
-      {currentKey === "projects" && (
-        <ProjectsStep
-          value={state.projectLinks}
-          onChange={(projectLinks) => patch({ projectLinks })}
-          onContinue={next}
-          onSkip={next}
-          onBack={back}
-        />
-      )}
+              {currentKey === "projects" && (
+                <ProjectsStep
+                  value={state.projectLinks}
+                  onChange={(projectLinks) => patch({ projectLinks })}
+                  onContinue={next}
+                  onSkip={next}
+                  onBack={back}
+                />
+              )}
 
-      {currentKey === "github" && (
-        <GithubStep
-          username={state.githubUsername}
-          connectionError={githubConnectionError}
-          onContinue={next}
-          onSkip={next}
-          onBack={back}
-        />
-      )}
+              {currentKey === "github" && (
+                <GithubStep
+                  username={state.githubUsername}
+                  connectionError={githubConnectionError}
+                  onContinue={next}
+                  onSkip={next}
+                  onBack={back}
+                />
+              )}
 
-      {currentKey === "review" && (
-        <ReviewStep
-          hasResume={!!state.resumeFileUrl}
-          resumeUsedOcr={state.resumeUsedOcr}
-          resumeSkills={state.resumeSkills}
-          onResumeSkillsChange={(resumeSkills) => patch({ resumeSkills })}
-          skillRatings={state.skillRatings}
-          interestTags={state.interestTags}
-          availability={state.availability}
-          projectLinks={state.projectLinks}
-          githubUsername={state.githubUsername}
-          onEditStep={goTo}
-          onBack={back}
-          onSubmit={handleSubmit}
-          isSubmitting={isSubmitting}
-          error={submitError}
-        />
-      )}
+              {currentKey === "review" && (
+                <ReviewStep
+                  hasResume={!!state.resumeFileUrl}
+                  resumeUsedOcr={state.resumeUsedOcr}
+                  resumeSkills={state.resumeSkills}
+                  onResumeSkillsChange={(resumeSkills) => patch({ resumeSkills })}
+                  skillRatings={state.skillRatings}
+                  interestTags={state.interestTags}
+                  availability={state.availability}
+                  projectLinks={state.projectLinks}
+                  githubUsername={state.githubUsername}
+                  onEditStep={goTo}
+                  onBack={back}
+                  onSubmit={handleSubmit}
+                  isSubmitting={isSubmitting}
+                  error={submitError}
+                />
+              )}
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

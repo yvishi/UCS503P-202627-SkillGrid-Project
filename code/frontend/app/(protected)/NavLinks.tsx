@@ -1,0 +1,48 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const LINKS = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/profile", label: "Profile" },
+];
+
+function isActive(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+// Active state is drawn as a filled evidence cell under the label, so the
+// nav speaks the same visual language as the grid.
+export function NavLinks({ className = "" }: { className?: string }) {
+  const pathname = usePathname() ?? "";
+
+  return (
+    <nav aria-label="Main" className={className}>
+      <ul className="flex items-center gap-1">
+        {LINKS.map(({ href, label }) => {
+          const active = isActive(pathname, href);
+          return (
+            <li key={href}>
+              <Link
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={`relative flex items-center gap-2 rounded-theme-sm px-2.5 py-1.5 text-sm font-medium transition-colors ${
+                  active ? "text-ink" : "text-ink-muted hover:bg-surface-alt hover:text-ink"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`h-2 w-2 rounded-[2px] transition-colors ${
+                    active ? "bg-trust" : "border border-border-strong"
+                  }`}
+                />
+                {label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
