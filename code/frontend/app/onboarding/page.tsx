@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { listOpenReports } from "@/lib/skill-requests";
+import { getUserSkills } from "@/lib/user-skills";
 import { ThemeToggle } from "@/app/ui/ThemeToggle";
 
 import { OnboardingWizard } from "./OnboardingWizard";
@@ -19,6 +21,10 @@ export default async function OnboardingPage() {
   if (profile?.onboardingCompletedAt) {
     redirect("/dashboard");
   }
+
+  // Skills save as they're picked (spec 5.2), so a returning user who
+  // abandoned onboarding gets their earlier picks back.
+  const [skills, reports] = await Promise.all([getUserSkills(session.user.id), listOpenReports(session.user.id)]);
 
   return (
     <div className="bg-graph flex min-h-full flex-1 flex-col">
@@ -38,7 +44,7 @@ export default async function OnboardingPage() {
       </header>
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:px-6 sm:py-12">
-        <OnboardingWizard userId={session.user.id} />
+        <OnboardingWizard userId={session.user.id} initialSkills={{ skills, reports }} />
       </main>
 
       <footer className="mx-auto w-full max-w-2xl px-4 pb-8 sm:px-6">

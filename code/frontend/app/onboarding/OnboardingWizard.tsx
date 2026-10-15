@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import type { AvailabilityOption } from "@/lib/onboarding-options";
-import type { SkillRatings, SkillSlug } from "@/lib/skills";
+import type { SkillEditorState } from "@/app/ui/skill-picker/use-skill-editor";
+import type { EvidenceSnapshot } from "@/lib/skill-suggestions";
+
+import { getEvidenceSnapshotAction } from "@/app/skills/actions";
 
 import { submitOnboardingAction } from "./actions";
 import { Stepper, type StepKey } from "./Stepper";
@@ -27,8 +30,9 @@ const STEPS_B: StepKey[] = ["skills", "interests", "availability", "projects", "
 // stay server-side), just the same form values the wizard already tracks.
 // Keyed per-user so a shared/lab machine can't rehydrate one signed-in
 // user's in-progress answers into the next user's session.
+// v2: skills moved to the database (saved as picked), so drafts no longer carry them.
 function getStorageKey(userId: string): string {
-  return `skillgrid_onboarding_wizard_v1:${userId}`;
+  return `skillgrid_onboarding_wizard_v2:${userId}`;
 }
 
 type WizardState = {
@@ -36,9 +40,8 @@ type WizardState = {
   stepIndex: number;
   resumeFileUrl: string | null;
   resumeEvidenceId: string | null;
-  resumeSkills: SkillSlug[];
+  resumeSkills: string[];
   resumeUsedOcr: boolean;
-  skillRatings: SkillRatings;
   interestTags: string[];
   availability: AvailabilityOption | null;
   projectLinks: string[];
@@ -53,7 +56,6 @@ const INITIAL_STATE: WizardState = {
   resumeEvidenceId: null,
   resumeSkills: [],
   resumeUsedOcr: false,
-  skillRatings: {},
   interestTags: [],
   availability: null,
   projectLinks: [],
@@ -97,7 +99,7 @@ function computeInitialState(userId: string): WizardState {
   };
 }
 
-export function OnboardingWizard({ userId }: { userId: string }) {
+export function OnboardingWizard({ userId, initialSkills }: { userId: string; initialSkills: SkillEditorState }) {
   const [state, setState] = useState<WizardState>(() => computeInitialState(userId));
   const [githubConnectionError] = useState(
     () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("github") === "error",
@@ -105,6 +107,10 @@ export function OnboardingWizard({ userId }: { userId: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
+  // Skills live in the database, not the sessionStorage draft; this just
+  // mirrors the picker's list for Continue and the Review preview.
+  const [skillState, setSkillState] = useState<SkillEditorState>(initialSkills);
+  const [evidence, setEvidence] = useState<EvidenceSnapshot | null>(null);
 
   // Strip the OAuth callback's query params so a refresh doesn't re-apply
   // them. Doesn't call setState -- this is a real side effect (URL), not
@@ -126,6 +132,22 @@ export function OnboardingWizard({ userId }: { userId: string }) {
   const steps = state.path === "A" ? STEPS_A : STEPS_B;
   const currentKey = steps[state.stepIndex];
 
+  // Suggestions and the Review preview read the user's evidence, which
+  // changes mid-wizard (resume upload, GitHub connect) -- refetch it
+  // whenever one of the two screens that show it opens.
+  useEffect(() => {
+    if (currentKey !== "skills" && currentKey !== "review") return;
+    let cancelled = false;
+    getEvidenceSnapshotAction(state.resumeEvidenceId)
+      .then((snapshot) => {
+        if (!cancelled) setEvidence(snapshot);
+      })
+      .catch((err) => console.error("Loading evidence failed:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [currentKey, state.resumeEvidenceId, state.githubEvidenceId]);
+
   function patch(next: Partial<WizardState>) {
     setState((prev) => ({ ...prev, ...next }));
   }
@@ -143,17 +165,8 @@ export function OnboardingWizard({ userId }: { userId: string }) {
     setIsSubmitting(true);
     setSubmitError(null);
 
-    // Reconcile resume-extracted tags into skillRatings: anything still
-    // present in the editable review list that wasn't manually rated gets
-    // a default "Comfortable" rating, since it showed up on the resume.
-    const merged: SkillRatings = { ...state.skillRatings };
-    for (const slug of state.resumeSkills) {
-      if (!merged[slug]) merged[slug] = "INTERMEDIATE";
-    }
-
     try {
       const result = await submitOnboardingAction({
-        skillRatings: merged,
         interestTags: state.interestTags,
         availability: state.availability,
         projectLinks: state.projectLinks,
@@ -213,8 +226,9 @@ export function OnboardingWizard({ userId }: { userId: string }) {
 
               {currentKey === "skills" && (
                 <SkillsStep
-                  value={state.skillRatings}
-                  onChange={(skillRatings) => patch({ skillRatings })}
+                  value={skillState}
+                  evidence={evidence}
+                  onChange={setSkillState}
                   onContinue={next}
                   onBack={state.path === "A" ? back : undefined}
                 />
@@ -262,9 +276,9 @@ export function OnboardingWizard({ userId }: { userId: string }) {
                 <ReviewStep
                   hasResume={!!state.resumeFileUrl}
                   resumeUsedOcr={state.resumeUsedOcr}
-                  resumeSkills={state.resumeSkills}
-                  onResumeSkillsChange={(resumeSkills) => patch({ resumeSkills })}
-                  skillRatings={state.skillRatings}
+                  skills={skillState.skills}
+                  reports={skillState.reports}
+                  evidence={evidence}
                   interestTags={state.interestTags}
                   availability={state.availability}
                   projectLinks={state.projectLinks}

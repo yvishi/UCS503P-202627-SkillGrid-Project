@@ -3,7 +3,6 @@
 import { useActionState, useRef, useState } from "react";
 
 import { checkResumeAction, type ResumeCheckState } from "../actions";
-import type { SkillSlug } from "@/lib/skills";
 import { PrimaryButton, TrustBadge } from "@/app/ui/primitives";
 
 import { ArrowRight, StepCard, StepFooter, StepHeading } from "./StepShell";
@@ -17,7 +16,7 @@ export function ResumeStep({
   onPassed,
   onSwitchToManual,
 }: {
-  onPassed: (result: { fileUrl: string; evidenceId: string; extractedSkills: SkillSlug[]; usedOcr: boolean }) => void;
+  onPassed: (result: { fileUrl: string; evidenceId: string; extractedSkills: string[]; usedOcr: boolean }) => void;
   onSwitchToManual: () => void;
 }) {
   const [state, formAction, isPending] = useActionState<ResumeCheckState, FormData>(
