@@ -58,6 +58,7 @@ export function SkillRatingRow({
     if (target === null) return;
     e.preventDefault();
     buttons.current[target]?.focus();
+    if (busy) return;
     if (SKILL_RATING_LEVELS[target] !== level) onSelect(SKILL_RATING_LEVELS[target]);
   }
 
@@ -92,12 +93,12 @@ export function SkillRatingRow({
                 type="button"
                 role="radio"
                 aria-checked={checked}
-                disabled={busy}
+                aria-disabled={busy}
                 aria-label={SKILL_RATING_LABELS[lvl]}
                 title={SKILL_RATING_LABELS[lvl]}
                 tabIndex={checked ? 0 : -1}
                 onClick={() => {
-                  if (!checked) onSelect(lvl);
+                  if (!checked && !busy) onSelect(lvl);
                 }}
                 onKeyDown={(e) => onKeyDown(e, i)}
                 onPointerEnter={(e) => {
@@ -121,11 +122,13 @@ export function SkillRatingRow({
         </div>
         <button
           type="button"
-          onClick={onRemove}
-          disabled={busy}
+          onClick={() => {
+            if (!busy) onRemove();
+          }}
+          aria-disabled={busy}
           aria-label={`Remove ${label}`}
           title={`Remove ${label}`}
-          className="ml-1 grid h-9 w-9 place-items-center rounded-theme-sm text-ink-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+          className="ml-1 grid h-9 w-9 place-items-center rounded-theme-sm text-ink-muted transition hover:bg-danger/10 hover:text-danger aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
         >
           <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path strokeLinecap="round" d="M5 5l10 10M15 5L5 15" />

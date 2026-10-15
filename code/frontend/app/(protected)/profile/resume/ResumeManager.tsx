@@ -294,7 +294,7 @@ function ResumeRow({ resume }: { resume: ResumeEntry }) {
           ))
         ) : (
           <span className="text-xs text-ink-muted">
-            No skills from our list were found in this file.
+            No skills from the catalog were found in this file.
           </span>
         )}
       </div>

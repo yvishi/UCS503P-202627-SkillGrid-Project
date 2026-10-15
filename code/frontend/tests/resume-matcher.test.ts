@@ -50,6 +50,11 @@ describe("matchSkillsInText", () => {
     expect(match("I react quickly to feedback")).toEqual([]);
   });
 
+  it("lets strictMatch skills match their ALL-CAPS form but never lowercase", () => {
+    expect(match("Skills: REACT, GO")).toEqual(["go", "react"]);
+    expect(match("I react quickly")).toEqual([]);
+  });
+
   it("only counts single-letter skills inside a Skills section", () => {
     expect(match("Grade: C in Chemistry\nSKILLS\nPython, R\nEducation\nC programming course")).toEqual(["python", "r"]);
   });

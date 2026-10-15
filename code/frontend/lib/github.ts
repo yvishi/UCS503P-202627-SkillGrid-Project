@@ -178,8 +178,12 @@ export async function scanGithubSkills(
 
   const languages: (ReturnType<typeof qualifyLanguages>[number] & { slug: string })[] = [];
   for (const stat of qualifyLanguages(perRepo)) {
-    const skill = await resolveGithubLanguage(stat.language);
-    languages.push({ ...stat, slug: skill.slug });
+    try {
+      const skill = await resolveGithubLanguage(stat.language);
+      languages.push({ ...stat, slug: skill.slug });
+    } catch (err) {
+      console.error(`GitHub language "${stat.language}" could not be resolved; skipping it`, err);
+    }
   }
 
   const catalog = await getCatalog();

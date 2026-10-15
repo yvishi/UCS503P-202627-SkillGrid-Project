@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { Empty, Eyebrow } from "@/app/ui/primitives";
+import { getAdminUser } from "@/lib/admin";
 import { listReviewQueue } from "@/lib/skill-review";
 
 import { ReviewGroupCard } from "./ReviewGroupCard";
@@ -9,9 +11,10 @@ export const metadata: Metadata = {
   title: "SkillGrid – Skill reports",
 };
 
-// Access is enforced by app/admin/layout.tsx (404 for non-admins) and
-// re-checked in every action.
+// Access is enforced by app/admin/layout.tsx (404 for non-admins), re-checked
+// here (layouts can be skipped on partial renders) and in every action.
 export default async function SkillRequestsPage() {
+  if (!(await getAdminUser())) notFound();
   const groups = await listReviewQueue();
 
   return (

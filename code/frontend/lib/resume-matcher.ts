@@ -71,7 +71,9 @@ export function matchSkillsInText(text: string, catalog: readonly MatchableSkill
       if (!term) return false;
       // A lone letter ("C", "R") is only trusted in a list of skills.
       const haystack = term.length === 1 ? skillsSection : text;
-      return termPattern(term, skill.strictMatch).test(haystack);
+      if (!skill.strictMatch) return termPattern(term, false).test(haystack);
+      // Case-sensitive, but an ALL-CAPS resume ("REACT", "PYTHON") still counts.
+      return termPattern(term, true).test(haystack) || termPattern(term.toUpperCase(), true).test(haystack);
     });
     if (hit) found.push(skill.slug);
   }
