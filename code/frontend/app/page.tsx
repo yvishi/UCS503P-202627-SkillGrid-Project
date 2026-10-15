@@ -42,7 +42,7 @@ const SOURCES = [
     column: "Resume",
     tone: "trust",
     title: "What you've written down",
-    body: "Upload your resume as a PDF and we match it against a fixed list of 20 skills. Skills it names fill this column.",
+    body: "Upload your resume as a PDF and we match it against a catalog of hundreds of languages, frameworks and tools. Skills it names fill this column.",
     sample: [0, 2, 3, 2] as CellLevel[],
   },
   {

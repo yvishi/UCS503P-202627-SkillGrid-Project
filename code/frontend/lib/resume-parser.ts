@@ -1,7 +1,8 @@
 import { PDFParse } from "pdf-parse";
 
 import { extractTextViaOcr, OcrError } from "@/lib/ocr";
-import { SKILL_KEYWORDS, type SkillSlug } from "@/lib/skills";
+import { matchSkillsInText } from "@/lib/resume-matcher";
+import { getCatalog } from "@/lib/skill-catalog";
 
 export async function extractPdfText(buffer: Buffer): Promise<string> {
   const parser = new PDFParse({ data: buffer });
@@ -84,33 +85,11 @@ export function checkResumeIntegrity(text: string): IntegrityCheckResult {
   return { passed: true };
 }
 
-// The "slow full parse" from section 4.1: a keyword match against the
-// fixed skill list (lib/skills.ts) run over whichever text source won
+// The "slow full parse" from section 4.1: match the extracted text
 // (pdf-parse's text layer, or OCR for scanned resumes -- see
-// extractResumeText above). Kept as a separate step from the integrity
-// check to preserve the fast-check/full-parse split the spec calls for.
-// Plain substring matching false-positives on short/common keywords --
-// e.g. "ts" (TypeScript) matches inside "projects", and "git" matches
-// inside "digital". Word-boundary matching fixes both, and also stops
-// "java" matching inside "javascript". Keywords containing punctuation
-// (e.g. "c++", "node.js", " go ") can't use \b cleanly, so those still
-// fall back to substring matching.
-const ALPHANUMERIC_KEYWORD = /^[a-z0-9]+$/;
-
-function keywordAppears(lower: string, keyword: string): boolean {
-  if (ALPHANUMERIC_KEYWORD.test(keyword)) {
-    return new RegExp(`\\b${keyword}\\b`).test(lower);
-  }
-  return lower.includes(keyword);
-}
-
-export function extractSkillsFromResumeText(text: string): SkillSlug[] {
-  const lower = text.toLowerCase();
-  const found: SkillSlug[] = [];
-  for (const [slug, keywords] of Object.entries(SKILL_KEYWORDS) as [SkillSlug, string[]][]) {
-    if (keywords.some((keyword) => keywordAppears(lower, keyword))) {
-      found.push(slug);
-    }
-  }
-  return found;
+// extractResumeText above) against the whole skill catalog. Kept as a
+// separate step from the integrity check to preserve the
+// fast-check/full-parse split. Matching rules live in lib/resume-matcher.ts.
+export async function extractSkillsFromResumeText(text: string): Promise<string[]> {
+  return matchSkillsInText(text, await getCatalog());
 }

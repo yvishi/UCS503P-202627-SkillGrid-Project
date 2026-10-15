@@ -4,7 +4,6 @@ import {
   extractResumeText,
   extractSkillsFromResumeText,
 } from "@/lib/resume-parser";
-import type { SkillSlug } from "@/lib/skills";
 
 const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 
@@ -14,7 +13,7 @@ export type ResumeUploadResult =
       ok: true;
       fileUrl: string;
       filename: string;
-      extractedSkills: SkillSlug[];
+      extractedSkills: string[];
       usedOcr: boolean;
     };
 
@@ -23,7 +22,7 @@ export type ResumeUploadResult =
 // falling back to OCR for scanned files -- see lib/resume-parser.ts), run
 // the integrity check, extract skills, then upload to blob storage. Doesn't
 // touch the database -- callers decide what to do with the result (create
-// an EvidenceRecord, update Profile.skillRatings, etc).
+// an EvidenceRecord, make it the active resume, etc).
 export async function processResumeUpload(userId: string, file: File): Promise<ResumeUploadResult> {
   if (file.size === 0) {
     return { ok: false, reason: "Please upload a resume to continue." };
@@ -58,7 +57,7 @@ export async function processResumeUpload(userId: string, file: File): Promise<R
     return { ok: false, reason: integrity.reason! };
   }
 
-  const extractedSkills = extractSkillsFromResumeText(text);
+  const extractedSkills = await extractSkillsFromResumeText(text);
 
   try {
     const fileUrl = await uploadResume(userId, file);
