@@ -5,11 +5,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getEvidenceStatus } from "@/lib/evidence";
 import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
-import { parseSkillRatings, skillLabel } from "@/lib/skills";
 import { TEAMMATE_FIXTURES, TEAM_FIXTURES } from "@/lib/dashboard-fixtures";
 
 import { ConnectGithubButton, GithubConnectionBanner } from "@/app/ui/ConnectGithubButton";
 import { EvidenceGrid, GridLegend } from "@/app/ui/EvidenceGrid";
+import { ExpandableEvidenceGrid } from "@/app/ui/ExpandableEvidenceGrid";
 import { CountUp, Reveal } from "@/app/ui/motion";
 import {
   Empty,
@@ -95,14 +95,13 @@ export default async function DashboardPage({
     getEvidenceStatus(userId),
   ]);
   const profile = profileOrNull!;
-  const grid = await getSkillGrid(userId, profile);
+  const grid = await getSkillGrid(userId, profile.activeResumeId);
 
   const name = session.user?.name ?? session.user?.email ?? "there";
   const firstName = name.split(" ")[0];
 
   const connectedCount = [resumeUploaded, githubConnected].filter(Boolean).length;
-  const skillRatings = parseSkillRatings(profile.skillRatings);
-  const ratedSkillSlugs = Object.keys(skillRatings);
+  const ratedSkills = grid.userSkills;
   const gridSize = grid.rows.length <= 8 ? "lg" : "md";
 
   return (
@@ -138,7 +137,7 @@ export default async function DashboardPage({
           {grid.rows.length > 0 ? (
             <div className="grid gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
               <div className="flex min-w-0 flex-col gap-5">
-                <EvidenceGrid
+                <ExpandableEvidenceGrid
                   columns={GRID_COLUMNS}
                   rows={grid.rows}
                   selfColumn={0}
@@ -149,9 +148,9 @@ export default async function DashboardPage({
               </div>
 
               <dl className="flex flex-col gap-4 border-t border-border pt-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                <SourceNote name="Self" swatch={ratedSkillSlugs.length > 0 ? "self" : "empty"}>
-                  {ratedSkillSlugs.length > 0
-                    ? `${ratedSkillSlugs.length} ${ratedSkillSlugs.length === 1 ? "skill" : "skills"} rated. Shown in amber because it's your own word.`
+                <SourceNote name="Self" swatch={ratedSkills.length > 0 ? "self" : "empty"}>
+                  {ratedSkills.length > 0
+                    ? `${ratedSkills.length} ${ratedSkills.length === 1 ? "skill" : "skills"} rated. Shown in amber because it's your own word.`
                     : "Nothing rated yet."}
                 </SourceNote>
                 <SourceNote name="Resume" swatch={grid.resume && grid.resume.skillCount > 0 ? "evidence" : "empty"}>
@@ -173,8 +172,8 @@ export default async function DashboardPage({
                 <SourceNote name="GitHub" swatch={grid.github && grid.github.skillCount > 0 ? "evidence" : "empty"}>
                   {grid.github
                     ? grid.github.skillCount > 0
-                      ? `${grid.github.skillCount} ${grid.github.skillCount === 1 ? "language" : "languages"} from @${grid.github.username}'s public repos.`
-                      : `Connected as @${grid.github.username}. No repo languages match the skill list yet.`
+                      ? `${grid.github.skillCount} ${grid.github.skillCount === 1 ? "skill" : "skills"} from @${grid.github.username}'s public repos.`
+                      : `Connected as @${grid.github.username}. No skills detected in the public repos yet.`
                     : "Not connected yet. Connect it under quick actions."}
                 </SourceNote>
                 <SourceNote name="Peers" swatch="empty">
@@ -224,10 +223,10 @@ export default async function DashboardPage({
         />
         <StatCard
           label="Skills on file"
-          value={<CountUp to={ratedSkillSlugs.length} />}
+          value={<CountUp to={ratedSkills.length} />}
           hint={
-            ratedSkillSlugs.length > 0
-              ? ratedSkillSlugs.slice(0, 2).map(skillLabel).join(", ")
+            ratedSkills.length > 0
+              ? ratedSkills.slice(0, 2).map((s) => s.name).join(", ")
               : "None rated yet"
           }
         />

@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useId, useState, useTransition } from "react";
 
 import { Eyebrow, PrimaryButton, Pill, SecondaryButton } from "@/app/ui/primitives";
-import { skillLabel } from "@/lib/skills";
 
 import { reuploadResumeAction, selectResumeAction, type ReuploadState } from "./actions";
 
@@ -11,7 +10,7 @@ export type ResumeEntry = {
   id: string;
   filename: string;
   uploadedAt: string;
-  extractedSkills: string[];
+  extractedSkills: { slug: string; name: string }[];
   usedOcr: boolean;
   active: boolean;
 };
@@ -288,14 +287,14 @@ function ResumeRow({ resume }: { resume: ResumeEntry }) {
       )}
       <div className="flex flex-wrap gap-1.5 pl-6">
         {resume.extractedSkills.length > 0 ? (
-          resume.extractedSkills.map((slug) => (
+          resume.extractedSkills.map(({ slug, name }) => (
             <Pill key={slug} tone="trust">
-              {skillLabel(slug)}
+              {name}
             </Pill>
           ))
         ) : (
           <span className="text-xs text-ink-muted">
-            No skills from our list were found in this file.
+            No skills from the catalog were found in this file.
           </span>
         )}
       </div>

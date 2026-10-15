@@ -24,7 +24,7 @@ export function GithubStep({
   return (
     <StepShell
       title="Link your GitHub"
-      description="Optional. Connecting pulls your public repo languages in as evidence."
+      description="Optional. Connecting pulls your public repo languages and topics in as evidence."
       onContinue={onContinue}
       onSkip={onSkip}
       onBack={onBack}
@@ -46,7 +46,7 @@ export function GithubStep({
             {username ? (
               <>
                 <TrustBadge className="self-start">Connected as @{username}</TrustBadge>
-                <p className="text-sm text-ink-muted">Your repo languages will show up as evidence on your grid.</p>
+                <p className="text-sm text-ink-muted">Skills from your repos will show up as evidence on your grid.</p>
               </>
             ) : (
               <>

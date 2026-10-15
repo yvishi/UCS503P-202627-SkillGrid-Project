@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { findSkillNames } from "@/lib/skill-catalog";
+import { expandLegacySlugs } from "@/lib/skill-normalize";
 
 import { ResumeManager, type ResumeEntry } from "./ResumeManager";
 
@@ -22,17 +24,22 @@ export default async function ResumePage() {
     }),
   ]);
 
+  // Old payloads may hold the two retired combined slugs; expand them so
+  // each resolves to a catalog name.
+  const slugsOf = (payload: unknown): string[] =>
+    expandLegacySlugs((payload as { extractedSkills?: string[] }).extractedSkills ?? []);
+  const names = await findSkillNames([...new Set(records.flatMap((r) => slugsOf(r.payload)))]);
+
   const resumes: ResumeEntry[] = records.map((record) => {
     const payload = record.payload as {
       filename?: string;
-      extractedSkills?: string[];
       usedOcr?: boolean;
     };
     return {
       id: record.id,
       filename: payload.filename ?? "resume.pdf",
       uploadedAt: record.createdAt.toISOString(),
-      extractedSkills: payload.extractedSkills ?? [],
+      extractedSkills: slugsOf(record.payload).map((slug) => ({ slug, name: names.get(slug) ?? slug })),
       usedOcr: payload.usedOcr ?? false,
       active: record.id === profile?.activeResumeId,
     };
