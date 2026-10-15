@@ -24,6 +24,8 @@ model User {
 
   profile         Profile?
   evidenceRecords EvidenceRecord[]
+  skills          UserSkill[]
+  skillRequests   SkillRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -140,4 +142,93 @@ model EvidenceRecord {
 
   @@index([userId, source])
   @@map("evidence_records")
+}
+
+// ---------------------------------------------------------------------------
+// Open skill catalog (docs/superpowers/specs/2026-10-15-open-skill-catalog-design.md)
+// ---------------------------------------------------------------------------
+
+// One row per skill anyone can hold. `keys` holds skillKey() of the slug,
+// name and every alias (lib/skill-normalize.ts) so "ReactJS" and "react.js"
+// both find React with one indexed lookup.
+model Skill {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  name        String
+  aliases     String[]      @default([])
+  keys        String[]      @default([])
+  category    SkillCategory @default(OTHER)
+  origin      SkillOrigin   @default(CURATED)
+  // Resume matching is case-sensitive for names that are ordinary words.
+  strictMatch Boolean       @default(false)
+
+  users UserSkill[]
+
+  createdAt DateTime @default(now())
+
+  @@index([keys], type: Gin)
+  @@map("skills")
+}
+
+// A user's self-rated skill. Replaces the old Profile.skillRatings JSON.
+model UserSkill {
+  userId  String
+  skillId String
+  level   ComfortLevel
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, skillId])
+  @@index([skillId])
+  @@map("user_skills")
+}
+
+// A skill a user couldn't find in the catalog. Nothing enters the catalog
+// until an admin approves or merges it (app/admin/skill-requests).
+model SkillRequest {
+  id              String             @id @default(cuid())
+  userId          String
+  rawName         String
+  key             String
+  requestedLevel  ComfortLevel
+  note            String?
+  status          SkillRequestStatus @default(PENDING)
+  resolvedSkillId String?
+  reviewedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([status, key])
+  @@map("skill_requests")
+}
+
+enum SkillCategory {
+  LANGUAGE
+  FRAMEWORK
+  LIBRARY
+  TOOL
+  PLATFORM
+  DATABASE
+  DESIGN
+  CONCEPT
+  OTHER
+}
+
+enum SkillOrigin {
+  CURATED
+  GITHUB
+  REQUESTED
+}
+
+enum SkillRequestStatus {
+  PENDING
+  APPROVED
+  MERGED
+  REJECTED
 }
