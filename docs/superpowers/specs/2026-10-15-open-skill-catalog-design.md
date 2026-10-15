@@ -146,17 +146,20 @@ enum SkillRequestStatus {
 
 - `findSkillByText(text)`: one indexed query, `keys has skillKey(text)`.
 - `resolveGithubLanguage(name)`: `findSkillByText`, else create with `origin: GITHUB`,
-  `category: LANGUAGE`. Unique-slug race → catch, re-find. **Only GitHub linguist names may create
-  skills automatically**; user input never does.
-- `searchSkills(query, limit = 10)`: ranked groups — exact key match → name/slug prefix →
-  substring (name, slug or alias). Within each group, order by `UserSkill` count desc, then name.
-  Each result includes `matchedAlias` when an alias matched.
-- `suggestSimilar(text, limit = 3)`: closest skills by `editDistance` over cached keys, with
-  distance ≤ max(1, floor(len/4)).
-- `popularByCategory(category, limit = 12)`: for the browse panel.
-- **Catalog cache:** an in-memory list of `{ id, slug, name, aliases, keys, strictMatch }` with a
-  5-minute TTL, used by the resume matcher and `suggestSimilar`. Admin approve/merge invalidates it
-  on that instance. Other instances may lag up to 5 minutes.
+  `category: LANGUAGE`, `strictMatch: true` (linguist has names like "Hack" and "Red" that are
+  ordinary words, so their resume matching must be case-sensitive). Unique-slug race → catch,
+  re-find. **Only GitHub linguist names may create skills automatically**; user input never does.
+- **Catalog cache** (`getCatalog()`): an in-memory list of
+  `{ slug, name, aliases, keys, category, strictMatch, users }` (`users` = `UserSkill` count) with a
+  5-minute TTL. Admin approve/merge and GitHub-created skills invalidate it on that instance. Other
+  instances may lag up to 5 minutes.
+- Search runs as pure functions over the cached list, in `lib/skill-catalog-core.ts`:
+  - `rankSkills(catalog, query, limit = 10)`: ranked groups — exact key match → key prefix → key
+    substring. Within each group, order by `users` desc, then name. Each result includes
+    `matchedAlias` when an alias (not the name or slug) matched.
+  - `suggestSimilarIn(catalog, text, limit = 3)`: closest skills by `editDistance` (optimal string
+    alignment, so a transposition like "raect" is 1 edit) with distance ≤ max(1, floor(len/4)).
+  - `popularIn(catalog, category, limit = 12)`: for the browse panel, `users` desc then name.
 
 ### 2.4 Seed catalog
 
@@ -178,13 +181,12 @@ enum SkillRequestStatus {
 
 1. Requires a session.
 2. Validates with `validateSkillName`; `note` ≤ 200 chars.
-3. If `findSkillByText(rawName)` now matches, the skill is added to the user directly
-   (onboarding: returned to the client to add to its state) and `{ status: "exists", skill }` is
-   returned instead of creating a request.
+3. If `findSkillByText(rawName)` now matches, the skill is added to the user directly and
+   `{ status: "exists", skill }` is returned instead of creating a request.
 4. If the user has ≥ 10 `PENDING` requests → error "You have 10 pending reports — wait for review."
 5. Creates the `SkillRequest`. A `(userId, key)` unique conflict → "You've already reported this."
 
-`cancelSkillRequestAction(id)`: the owner can delete their own `PENDING` request.
+`cancelReportAction(id)`: the owner can delete their own `PENDING` (cancel) or `REJECTED` (dismiss) request.
 
 Pending requests show to the user as grey "Pending review" rows. They are **not** in the grid and
 not used for matching. A `REJECTED` request shows once as "Not added" until dismissed (dismiss
@@ -194,7 +196,7 @@ deletes the request row).
 
 - `app/admin/layout.tsx`: `notFound()` unless the session email (case-insensitive) is in
   `ADMIN_EMAILS` (comma-separated env var). Every admin server action re-checks this via a shared
-  `requireAdmin()` in `lib/admin.ts`.
+  `getAdminUser()` in `lib/admin.ts` (returns the user or null).
 - Queue: `PENDING` requests grouped by `key`. Each group shows the distinct raw spellings, the number
   of reporters, notes, the oldest `createdAt`, and `suggestSimilar` candidates.
 - Actions per group, each one Prisma transaction:
@@ -256,8 +258,9 @@ deletes the request row).
 ### 4.2 Resume — `lib/resume-parser.ts`
 
 - Matching runs over the cached catalog (names and aliases), not `SKILL_KEYWORDS` (deleted).
-- Each keyword is regex-escaped and matched with `(?<![a-z0-9])kw(?![a-z0-9])` against lowercased
-  text. This handles `c++`, `c#`, `node.js` and `react native` uniformly.
+- Each keyword is regex-escaped and matched case-insensitively with
+  `(?<![A-Za-z0-9.])kw(?![A-Za-z0-9+#])`. This handles `c++`, `c#`, `node.js` and `react native`
+  uniformly, stops `C` matching inside `C++` or `C#`, and stops `JS` matching the end of `Node.js`.
 - `strictMatch` skills match case-sensitively against the **original** text using the display name
   and aliases as written ("Go" matches, "go to" does not).
 - Single-character names (C, R) additionally count only inside a detected Skills section: text from
@@ -266,12 +269,16 @@ deletes the request row).
 - `extractedSkills` remains `string[]` of slugs, now any catalog slug.
 - Resume upload (onboarding and `/profile/resume`) **no longer writes self-ratings**.
 
-### 4.3 Suggestions — `getSkillSuggestions(userId)` in `lib/skill-suggestions.ts`
+### 4.3 Suggestions — `lib/skill-suggestions.ts`
 
-The union of the GitHub payload skills and the active resume's `extractedSkills`, minus the user's
-`UserSkill`s. Each entry is `{ slug, name, sources: ("github" | "resume")[], strength }`, sorted by
-strength (GitHub level, +1 if also on the resume) then name. Onboarding computes the same from
-client state (resume result + GitHub record) through a server action.
+- `getEvidenceSnapshot(userId, resumeEvidenceId)` (server, `lib/evidence.ts`) returns
+  `{ github: { slug, level }[], resume: slug[], names: Record<slug, name> }` for the user's GITHUB
+  record and their active resume. Onboarding fetches it through `getEvidenceSnapshotAction`.
+- `rankSuggestions(snapshot, ownedSlugs)` (pure, runs in the picker) returns the union of GitHub and
+  resume skills minus the user's skills. Each entry is
+  `{ slug, name, sources: ("github" | "resume")[], strength }`, sorted by strength then name.
+  Strength is the GitHub level, +1 if also on the resume; resume-only skills get 3 (the Resume
+  column's level).
 
 ---
 
@@ -279,9 +286,10 @@ client state (resume result + GitHub record) through a server action.
 
 ### 5.1 `SkillPicker` — `app/ui/skill-picker/`
 
-A client component shared by onboarding and `/profile/skills`. It takes callbacks
-(`onAdd`, `onSetLevel`, `onRemove`, `onReport`, `onCancelReport`) so each host decides whether to
-persist immediately or hold state. Sections, top to bottom:
+A client component shared by onboarding and `/profile/skills`. It is self-contained: every change is
+saved straight away through the server actions in `app/skills/actions.ts`, with optimistic updates
+that revert on failure. Hosts pass the initial skills and reports plus the evidence snapshot, and may
+pass `onChange` to observe the current list. Sections, top to bottom:
 
 1. **Suggestions strip — "Found in your evidence"**: teal evidence chips labelled `GitHub` /
    `Resume`. Click adds the skill at Comfortable; **Add all** adds every suggestion. Hidden when empty.
@@ -299,15 +307,17 @@ persist immediately or hold state. Sections, top to bottom:
 
 ### 5.2 Onboarding
 
-- Wizard state: `skillRatings` → `skills: { slug, name, level }[]` and
-  `pendingReports: { id, rawName }[]`. The localStorage draft key gets a version suffix, so old
-  drafts are discarded.
-- `SkillsStep` hosts `SkillPicker` (state held client-side; reports go to the server immediately).
+- Skills are saved as the user picks them, exactly like `/profile/skills` (`UserSkill` rows do not
+  depend on a `Profile` row). An abandoned onboarding keeps them, and they reappear when the user
+  returns. The onboarding page loads the user's existing skills and reports and passes them in.
+- Wizard state drops `skillRatings`. It keeps the picker's current `{ skills, reports }` (via
+  `onChange`) only to drive Continue and the Review preview. The sessionStorage draft key moves to
+  `_v2`, so old drafts are discarded.
 - Continue requires ≥ 1 skill **or** ≥ 1 pending report.
 - `ReviewStep`: no more resume-tag reconciliation into ratings. The grid preview shows Self from
-  `skills`, plus Resume and GitHub columns as evidence when present.
-- `submitOnboardingAction` validates each slug exists in `Skill` and each level, then in one
-  transaction upserts the profile and replaces the user's `UserSkill` rows.
+  the user's skills, plus Resume and GitHub columns from the evidence snapshot.
+- `submitOnboardingAction` no longer receives skills. It checks server-side that the user has
+  ≥ 1 `UserSkill` or pending report, then upserts the profile.
 
 ### 5.3 `/profile/skills`
 
@@ -317,9 +327,11 @@ revert with a short error message on failure. The profile page's grid header get
 
 ### 5.4 Grid — `lib/skill-grid.ts`
 
-- `buildSkillGrid({ userSkills, resumePayload, githubPayload, skillNames })`, where
-  `userSkills: { slug, name, level }[]` and `skillNames: Map<slug, name>` covers evidence-only slugs
-  (fetched by the caller with one `Skill.findMany({ where: { slug: { in } } })`).
+- `buildSkillGrid({ userSkills, resumeSkills, githubSkills, skillNames })` takes already-parsed
+  evidence (`resumeSkillsFromPayload` / `githubSkillsFromPayload` do the parsing), so the server
+  pages and the onboarding Review preview share it. `userSkills: { slug, name, level }[]`, and
+  `skillNames: Map<slug, name>` covers evidence-only slugs (fetched by the caller with one
+  `Skill.findMany({ where: { slug: { in } } })`).
 - Rows: the union of user skills and evidence skills. The sort is unchanged (evidence desc, total
   desc, then name). Unknown slugs are dropped.
 - The GitHub column uses each payload skill's `level`; the Resume column stays at 3.
@@ -362,12 +374,16 @@ One Prisma migration, `open_skill_catalog`:
 3. Copy ratings: `INSERT INTO user_skills (...) SELECT ... FROM profiles p, jsonb_each_text(p."skillRatings") r`
    joined through a `VALUES` mapping table (legacy slug → new slug, two rows for each split slug),
    casting the level to `"ComfortLevel"`, `ON CONFLICT DO NOTHING`.
-4. Drop `profiles."skillRatings"`.
+4. Keep `profiles."skillRatings"` (marked deprecated, no longer read or written). `prisma migrate
+   deploy` applies all pending migrations at once, so dropping it in the same release would leave no
+   point at which to verify the copy on production. It is dropped in a follow-up migration once the
+   verify script passes there.
 
 Deployment follows current practice: migrations are run manually (the Vercel workflow does not
-migrate). Order: `npx prisma migrate deploy` → `npx prisma db seed`. Before migrating the deployed
-DB, run it on a copy of the dev DB and check that the `user_skills` row count ≥ the total number of
-keys across all `skillRatings` JSON values (splits make it greater).
+migrate). Order: `npx prisma migrate deploy` → `npx prisma db seed` →
+`npx tsx prisma/scripts/verify-skill-migration.ts`, which checks that the `user_skills` row count ≥ the
+number of valid entries across all `skillRatings` JSON values (splits make it greater). Run the same
+sequence on a dev database first.
 
 New env var: `ADMIN_EMAILS` (documented in `.env.example`).
 
