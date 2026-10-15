@@ -3,16 +3,17 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getEvidenceStatus } from "@/lib/evidence";
+import { getEvidenceStatus, loadSkillGrid } from "@/lib/evidence";
 import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
 
 import { Avatar } from "@/app/ui/Avatar";
 import { ConnectGithubButton, GithubConnectionBanner } from "@/app/ui/ConnectGithubButton";
-import { EvidenceGrid, GridLegend } from "@/app/ui/EvidenceGrid";
+import { GridLegend } from "@/app/ui/EvidenceGrid";
+import { ExpandableEvidenceGrid } from "@/app/ui/ExpandableEvidenceGrid";
 import { Reveal } from "@/app/ui/motion";
 import { Empty, Eyebrow, Pill, SectionCard, TrustBadge, buttonBase, secondaryButtonClass } from "@/app/ui/primitives";
 
-import { buildSkillGrid, githubSkillsFromPayload } from "@/lib/skill-grid";
+import { githubSkillsFromPayload } from "@/lib/skill-grid";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Profile",
@@ -58,11 +59,7 @@ export default async function ProfilePage({
         })
       : null);
 
-  const grid = buildSkillGrid({
-    skillRatings: profile.skillRatings,
-    resumePayload: resumeRecord?.payload,
-    githubPayload: githubRecord?.payload,
-  });
+  const { grid } = await loadSkillGrid(userId, profile.activeResumeId);
 
   const name = session.user?.name ?? session.user?.email ?? "Your profile";
   const email = session.user?.email ?? "";
@@ -126,7 +123,7 @@ export default async function ProfilePage({
           </div>
           <div className="bg-graph p-5 sm:p-6">
             {grid.rows.length > 0 ? (
-              <EvidenceGrid
+              <ExpandableEvidenceGrid
                 columns={grid.columns}
                 rows={grid.rows}
                 selfColumn={grid.selfColumn}

@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { skillLabel, type SkillSlug } from "@/lib/skills";
 import { Eyebrow, GoogleIcon, Pill, PrimaryButton, SecondaryButton } from "@/app/ui/primitives";
 import { ThemeToggle } from "@/app/ui/ThemeToggle";
 import { BlurText, Reveal } from "@/app/ui/motion";
@@ -16,17 +15,17 @@ import { GraphBackdrop } from "@/app/landing/GraphBackdrop";
 // are only claims. That contrast is the pitch.
 const COLUMNS = ["Self", "Resume", "GitHub", "Peers"];
 
-const SAMPLE: { slug: SkillSlug; cells: CellLevel[] }[] = [
-  { slug: "react", cells: [3, 3, 4, 0] },
-  { slug: "typescript", cells: [2, 2, 3, 0] },
-  { slug: "python", cells: [3, 2, 2, 0] },
-  { slug: "sql", cells: [2, 2, 0, 0] },
-  { slug: "docker", cells: [3, 0, 0, 0] },
-  { slug: "kubernetes", cells: [2, 0, 0, 0] },
-  { slug: "figma", cells: [3, 0, 0, 0] },
+const SAMPLE: GridRow[] = [
+  { label: "React", cells: [3, 3, 4, 0] },
+  { label: "TypeScript", cells: [2, 2, 3, 0] },
+  { label: "Python", cells: [3, 2, 2, 0] },
+  { label: "SQL", cells: [2, 2, 0, 0] },
+  { label: "Docker", cells: [3, 0, 0, 0] },
+  { label: "Kubernetes", cells: [2, 0, 0, 0] },
+  { label: "Figma", cells: [3, 0, 0, 0] },
 ];
 
-const SAMPLE_ROWS: GridRow[] = SAMPLE.map((s) => ({ label: skillLabel(s.slug), cells: s.cells }));
+const SAMPLE_ROWS: GridRow[] = SAMPLE;
 const BACKED = SAMPLE.filter((s) => s.cells.slice(1).some((l) => l > 0)).length;
 const CLAIMED_ONLY = SAMPLE_ROWS.filter((r) => r.cells.slice(1).every((l) => l === 0)).map((r) => r.label);
 

@@ -131,3 +131,10 @@ const GITHUB_LANGUAGE_TO_SKILL: Record<string, SkillSlug> = {
 export function mapGithubLanguageToSkill(language: string): SkillSlug | null {
   return GITHUB_LANGUAGE_TO_SKILL[language] ?? null;
 }
+
+// A newly added skill starts at "Comfortable" -- the user chose to add it,
+// so it isn't a cold start, and one click on the rating changes it.
+export const DEFAULT_SKILL_LEVEL: SkillRatingLevel = "INTERMEDIATE";
+
+/** One of the user's self-rated skills, as the UI shows it (from the UserSkill table). */
+export type UserSkillEntry = { slug: string; name: string; level: SkillRatingLevel };
