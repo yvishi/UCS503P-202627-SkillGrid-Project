@@ -1,11 +1,12 @@
 import { Avatar } from "@/app/ui/Avatar";
 import { EvidenceStrip, type CellLevel } from "@/app/ui/EvidenceGrid";
 import { Eyebrow, Pill, SecondaryButton } from "@/app/ui/primitives";
-import type { TeamFixture, TeammateFixture } from "@/lib/dashboard-fixtures";
+import type { TeamFixture } from "@/lib/dashboard-fixtures";
+import type { TeammateCardData } from "@/lib/discovery";
 
 const STRIP_CELLS = 8;
 
-// Turns the fixture's 0-100 `strength` into a strip of cells: one cell per
+// Turns a 0-100 evidence score into a strip of cells: one cell per
 // 12.5 points, ramping up the heat scale left to right so a stronger
 // profile reads as a longer, darker run.
 function strengthLevels(strength: number): CellLevel[] {
@@ -17,11 +18,17 @@ function strengthLevels(strength: number): CellLevel[] {
 
 const cardClass = "flex h-full flex-col gap-4 rounded-theme-lg border border-border bg-surface p-5";
 
-export function TeammateCard({ teammate }: { teammate: TeammateFixture }) {
+export function TeammateCard({
+  teammate,
+  action,
+}: {
+  teammate: TeammateCardData;
+  action?: React.ReactNode;
+}) {
   return (
     <article className={cardClass}>
       <div className="flex items-start gap-3">
-        <Avatar name={teammate.name} image={null} size="h-10 w-10 text-xs" />
+        <Avatar name={teammate.name} image={teammate.image} size="h-10 w-10 text-xs" />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-ink">{teammate.name}</h2>
           <p className="truncate text-xs text-ink-muted">{teammate.headline}</p>
@@ -37,15 +44,13 @@ export function TeammateCard({ teammate }: { teammate: TeammateFixture }) {
       <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
         <div className="flex items-center justify-between gap-3">
           <Eyebrow>Evidence on file</Eyebrow>
-          <span className="font-mono text-xs tabular-nums text-ink-muted">{teammate.strength}/100</span>
+          <span className="font-mono text-xs tabular-nums text-ink-muted">{teammate.evidenceScore}/100</span>
         </div>
         <EvidenceStrip
-          levels={strengthLevels(teammate.strength)}
-          label={`Evidence on file: ${teammate.strength} out of 100`}
+          levels={strengthLevels(teammate.evidenceScore)}
+          label={`Evidence on file: ${teammate.evidenceScore} out of 100`}
         />
-        <SecondaryButton type="button" className="mt-2 w-full px-3 py-2 text-xs">
-          Invite
-        </SecondaryButton>
+        {action}
       </div>
     </article>
   );
