@@ -28,16 +28,3 @@ export function PageHeader({
     </header>
   );
 }
-
-// The listings are fixtures until matching ships; say so plainly.
-export function SampleNote({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="flex items-start gap-3 rounded-theme-md border border-dashed border-border-strong bg-surface-alt px-4 py-3 text-sm text-ink-muted">
-      <span
-        aria-hidden="true"
-        className="mt-1 inline-block h-3 w-3 shrink-0 rounded-[3px] border border-dashed border-ink-muted"
-      />
-      <span>{children}</span>
-    </p>
-  );
-}

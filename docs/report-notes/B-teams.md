@@ -11,6 +11,19 @@
 - **Screenshots to take:** none.
 - **UML impact:** none (activity diagram for team formation can cite these rules).
 
+## B.2: Admin hackathon management  (2026-10-28, Claude)
+- **What was built:** An admin-only page at `/admin/hackathons` with a create form (name, optional slug, start and end as datetime-local in IST, smallest and largest team) and a list of hackathons showing dates in Asia/Kolkata, team size range and team count. A duplicate name shows "A hackathon with that name already exists."; non-admins get a 404 on the page and "Not allowed." from the action.
+- **Design decisions:** `createdById` comes from `getAdminUser()` inside the action, never from the form (rejected: hidden field, forgeable). The list is ordered by `createdAt` descending so the newest hackathon is first. Slug collisions are caught through `isUniqueViolation` rather than a pre-check, so two concurrent creates cannot both pass. The admin layout has no nav list, so no link was added.
+- **Files:** code/frontend/app/admin/hackathons/page.tsx, actions.ts, HackathonForm.tsx; tests/integration/admin-hackathons.test.ts.
+- **Schema:** none (reads and writes `Hackathon`).
+- **Tests:** 1 integration file, 4 tests: admin creates (IST stored as UTC, createdById set), duplicate name, non-admin writes no row, invalid dates return the parser error.
+- **Numbers for the report:** 211 lines added in code and tests (224 insertions in total with these notes, per `git diff --stat`), 4 integration tests added.
+- **Problems hit:** none.
+- **Screenshots to take:** `/admin/hackathons` with the form and a created "HackThapar 2026"; the duplicate-name error.
+- **UML impact:** use case diagram gains "Create hackathon" for the admin actor.
+
+Manual checks pending: render of the page in a browser and the non-admin 404 (covered by the layout and page guards, not run in a browser).
+
 ## B.3: Teams, participation, join and leave  (2026-10-28, Claude)
 - **What was built:** A "Hackathons" nav link and a `/hackathons` list (upcoming and running first, then ended, times shown in IST). Each `/hackathons/[slug]` page shows the user's team (members, lead, open slots, skills it is looking for, and a Leave button), or a "Create a team" form and a "Looking for a team" toggle. After a hackathon ends, team members see a "Give feedback" link to the Stream D route. `lib/teams.ts` holds `createTeam`, `setLookingForTeam`, `leaveTeam`, `getHackathonView`, `listHackathons` and `acceptInTransaction`, which the B.4 invitations task reuses.
 - **Design decisions:**
