@@ -66,3 +66,46 @@ Manual checks pending: render of the page in a browser and the non-admin 404 (co
   - Class diagram: Team, TeamMember and Participation, plus the `lib/teams.ts` service.
   - Sequence diagram: accept, with lock team, recheck, insert, cancel others.
   - Activity diagram: leave, with lead hand-over or team deletion.
+
+## B.4: Invitations and join requests  (2026-10-28, Claude)
+- **What was built:** Team leads can invite a user to their team, and users can ask to join a team. An "Invites" nav link shows how many items are waiting on the user. The `/invites` page has three sections: invitations to you (Accept or Decline), requests to the teams you lead (Accept or Decline), and everything you sent (Cancel while pending, then a status pill). Each row shows the team, the hackathon and the other person's name, never an email, and errors appear inline under the row. The four server actions in `app/(protected)/invites/actions.ts` are what the discovery cards will call in Task I.1, and `myLeadTeams` gives those cards the "invite to which team" choice.
+- **Design decisions:**
+  - Authorization lives on the server and is derived from the DB, never from client input. The actor is always `auth()`'s user. For an INVITE only the invitee may answer; for a REQUEST only the team's *current* lead may answer, so after a lead hand-over the new lead inherits pending requests. Rejected: storing the responder on the row, which goes stale when the lead leaves.
+  - Invite and request creation lock the team row (`SELECT ... FOR UPDATE`, the same lock as accept and leave) before checking "one PENDING row per (team, user)". Rejected: a partial unique index, because only Task 0.1 may add a migration; without the lock two quick clicks could create two pending rows.
+  - Accept runs `acceptInTransaction` inside `prisma.$transaction` at the default isolation level, after locking the team and reading the lead in the same transaction, so a concurrent lead change cannot slip between the permission check and the insert. The race decisions for the last slot (row lock) and one-team-per-hackathon (unique index with `ON CONFLICT DO NOTHING`) are described under B.3.
+  - Decline and cancel are conditional updates (`WHERE status = 'PENDING'`), so answering a row that was just cancelled or accepted reports "This invite is no longer open." instead of overwriting it.
+  - The invited user must have finished onboarding; a requester must have too.
+  - The third section shows sent invites as well as sent requests (the brief says "your sent requests"), so a lead can cancel an invite they sent. It keeps the 20 most recent rows, pending first, so a cancelled request (for example after joining another team) stays visible.
+  - The pending count is computed in the server `NavBar` and passed to the client `NavLinks`.
+- **Invite state machine (for the activity diagram):**
+  - created as `PENDING` by `inviteToTeamAction` (kind INVITE, only the team lead) or `requestToJoinAction` (kind REQUEST, by the joiner themselves)
+  - `PENDING → ACCEPTED`: INVITE by the invitee, REQUEST by the team's current lead; inside one transaction that locks the team, rechecks the hackathon has not ended, the joiner is in no team and the team is not full, inserts the member, and cancels the joiner's other pending rows in the hackathon
+  - `PENDING → DECLINED`: the same party that may accept
+  - `PENDING → CANCELLED`: the creator (`createdById`) by Cancel; or the system, when the joiner joins another team or creates a team in the same hackathon
+  - ACCEPTED, DECLINED and CANCELLED are final; any further answer is refused. If the team or hackathon is deleted, its rows are deleted with it (cascade).
+- **Files:** created `app/(protected)/invites/{page.tsx,actions.ts,InviteRow.tsx}`, `tests/integration/invites.test.ts`. Modified `lib/teams.ts` (`inviteToTeam`, `requestToJoin`, `acceptInvite`, `declineInvite`, `cancelInvite`, `countPendingForUser`, `myLeadTeams`, `listInvitesForUser`, slug helpers), `app/(protected)/NavLinks.tsx`, `app/(protected)/NavBar.tsx`.
+- **Schema:** none. Reads and writes TeamInvite; accept writes TeamMember and Participation through `acceptInTransaction`.
+- **Tests:** 13 integration tests in `tests/integration/invites.test.ts`, all calling the real server actions with a mocked session:
+  - the lead invites and is recorded as creator; a member who is not lead and an outsider are refused
+  - a duplicate pending invite is refused, also when a request from that person is pending
+  - an invitee who has not onboarded, an unknown user id and a signed-out caller are refused
+  - inviting someone already in a team is refused
+  - the invitee accepts and becomes MEMBER; the lead cannot accept the INVITE for them
+  - the lead accepts a REQUEST; the requester cannot accept their own
+  - decline by the wrong party (lead or outsider for an INVITE, requester or outsider for a REQUEST) is refused; the right party declines; a second answer is refused
+  - teamSizeMax 2: B accepts, C's accept returns "This team is full.", B's pending request to another team becomes CANCELLED and shows as cancelled in B's sent list
+  - only the creator may cancel; cancelling twice or accepting a cancelled invite is refused
+  - duplicate request, request while invited, and request from a member of another team are refused
+  - `countPendingForUser` counts invites to the user plus requests to their teams, and drops answered rows; names in the lists never contain "@"
+  - `myLeadTeams` lists only led teams in hackathons that have not ended
+- **Numbers for the report:** about 920 lines added (270 in `lib/teams.ts`, 280 in the three page files, 360 in tests). 13 integration tests added: unit suite 186 tests, integration suite 44 tests.
+- **Problems hit:** `TeamInvite` has no relation to its creator, so the sender's name for "Invitations to you" is looked up by `createdById` in a second query. Requests in "Sent by you" name the team's current lead instead.
+- **Manual checks pending:** the browser flow with three signed-in accounts (lead invites B and C, B accepts, C sees "This team is full.", B's other request shows as cancelled) was automated in `tests/integration/invites.test.ts` but not run in a browser; the nav badge and `/invites` page layout were not viewed in a browser.
+- **Screenshots to take:**
+  - nav with the Invites count badge
+  - `/invites` with a pending invitation (Accept and Decline), a pending request to your team, and a cancelled sent request
+  - the inline "This team is full." error on Accept
+- **UML impact:**
+  - Activity / state diagram: the invite state machine above.
+  - Use case diagram: "Invite to team" and "Answer join request" (team lead), "Request to join", "Answer invitation" and "Cancel invite or request" (participant).
+  - Sequence diagram: accept, from the action through the team lock to `acceptInTransaction`.
