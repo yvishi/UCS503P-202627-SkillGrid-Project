@@ -1,8 +1,7 @@
 import { Avatar } from "@/app/ui/Avatar";
 import { EvidenceStrip, type CellLevel } from "@/app/ui/EvidenceGrid";
-import { Eyebrow, Pill, SecondaryButton } from "@/app/ui/primitives";
-import type { TeamFixture } from "@/lib/dashboard-fixtures";
-import type { TeammateCardData } from "@/lib/discovery";
+import { Eyebrow, Pill } from "@/app/ui/primitives";
+import type { TeamCardData, TeammateCardData } from "@/lib/discovery";
 
 const STRIP_CELLS = 8;
 
@@ -56,7 +55,7 @@ export function TeammateCard({
   );
 }
 
-export function TeamCard({ team }: { team: TeamFixture }) {
+export function TeamCard({ team, action }: { team: TeamCardData; action?: React.ReactNode }) {
   const slotLabel = `${team.openSlots} open ${team.openSlots === 1 ? "slot" : "slots"}`;
   const totalSeats = team.members.length + team.openSlots;
 
@@ -65,7 +64,7 @@ export function TeamCard({ team }: { team: TeamFixture }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold text-ink">{team.name}</h2>
-          <p className="truncate text-xs text-ink-muted">{team.event}</p>
+          <p className="truncate text-xs text-ink-muted">{team.hackathonName}</p>
         </div>
         <Pill tone="warm">{slotLabel}</Pill>
       </div>
@@ -73,9 +72,11 @@ export function TeamCard({ team }: { team: TeamFixture }) {
       <div>
         <Eyebrow>Looking for</Eyebrow>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {team.lookingFor.map((tag) => (
-            <Pill key={tag}>{tag}</Pill>
-          ))}
+          {team.lookingFor.length > 0 ? (
+            team.lookingFor.map((tag) => <Pill key={tag}>{tag}</Pill>)
+          ) : (
+            <span className="text-xs text-ink-muted">Open to anyone</span>
+          )}
         </div>
       </div>
 
@@ -92,9 +93,7 @@ export function TeamCard({ team }: { team: TeamFixture }) {
           label={`${team.members.length} of ${totalSeats} seats filled`}
         />
         <p className="truncate text-xs text-ink-muted">Members: {team.members.join(", ")}</p>
-        <SecondaryButton type="button" className="mt-2 w-full px-3 py-2 text-xs">
-          Apply to join
-        </SecondaryButton>
+        {action}
       </div>
     </article>
   );

@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getEvidenceStatus } from "@/lib/evidence";
 import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
-import { TEAMMATE_FIXTURES, TEAM_FIXTURES } from "@/lib/dashboard-fixtures";
+import { findOpenTeams, findTeammates } from "@/lib/discovery";
 
 import { ConnectGithubButton, GithubConnectionBanner } from "@/app/ui/ConnectGithubButton";
 import { EvidenceGrid, GridLegend } from "@/app/ui/EvidenceGrid";
@@ -25,6 +25,7 @@ import {
   secondaryButtonClass,
 } from "@/app/ui/primitives";
 import { NavTile } from "./NavTile";
+import { TeamCard, TeammateCard } from "./MatchCards";
 import { GRID_COLUMNS, getSkillGrid } from "./grid-data";
 
 export const metadata: Metadata = {
@@ -33,24 +34,7 @@ export const metadata: Metadata = {
 
 const TOTAL_EVIDENCE_SOURCES = 2; // Resume + GitHub, for now (see EvidenceSource enum).
 
-// One entry per dashboard section -- adding a new one (e.g. "AI Team
-// Builder") is just another entry here.
-const DASHBOARD_SECTIONS = [
-  {
-    href: "/dashboard/teammates",
-    eyebrow: "People",
-    title: "Find teammates",
-    description: "Browse students building a profile and looking for a team.",
-    stat: `${TEAMMATE_FIXTURES.length} sample profiles`,
-  },
-  {
-    href: "/dashboard/teams",
-    eyebrow: "Groups",
-    title: "Find a team",
-    description: "Browse teams with an open slot for a hackathon or project.",
-    stat: `${TEAM_FIXTURES.length} sample teams`,
-  },
-];
+const PREVIEW_COUNT = 3;
 
 const linkButton = `${buttonBase} ${secondaryButtonClass} w-full`;
 
@@ -90,10 +74,34 @@ export default async function DashboardPage({
   const userId = session.user!.id!;
   const { github: githubStatus } = await searchParams;
 
-  const [profileOrNull, { resumeUploaded, githubConnected }] = await Promise.all([
-    prisma.profile.findUnique({ where: { userId } }),
-    getEvidenceStatus(userId),
-  ]);
+  const [profileOrNull, { resumeUploaded, githubConnected }, teammatePage, teamPage] =
+    await Promise.all([
+      prisma.profile.findUnique({ where: { userId } }),
+      getEvidenceStatus(userId),
+      findTeammates(userId, { skills: [], interest: null, availability: null, hackathon: null, page: 1 }),
+      findOpenTeams(userId, { hackathon: null, skill: null, page: 1 }),
+    ]);
+  const teammatePreview = teammatePage.items.slice(0, PREVIEW_COUNT);
+  const teamPreview = teamPage.items.slice(0, PREVIEW_COUNT);
+
+  // One entry per dashboard section. Adding a new one (e.g. "AI Team
+  // Builder") is just another entry here.
+  const sections = [
+    {
+      href: "/dashboard/teammates",
+      eyebrow: "People",
+      title: "Find teammates",
+      description: "Browse students building a profile and looking for a team.",
+      stat: `${teammatePage.items.length}${teammatePage.hasMore ? "+" : ""} ${teammatePage.items.length === 1 ? "person" : "people"}`,
+    },
+    {
+      href: "/dashboard/teams",
+      eyebrow: "Groups",
+      title: "Find a team",
+      description: "Browse teams with an open slot for a hackathon that has not ended.",
+      stat: `${teamPage.items.length}${teamPage.hasMore ? "+" : ""} open ${teamPage.items.length === 1 ? "team" : "teams"}`,
+    },
+  ];
   const profile = profileOrNull!;
   const grid = await getSkillGrid(userId, profile.activeResumeId);
 
@@ -246,12 +254,54 @@ export default async function DashboardPage({
         <div className="flex flex-col gap-6 lg:col-span-2">
           {/* ── Section tiles ──────────────────────────────────── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {DASHBOARD_SECTIONS.map((section, index) => (
+            {sections.map((section, index) => (
               <Reveal key={section.href} delay={index * 0.06} className="h-full">
                 <NavTile {...section} />
               </Reveal>
             ))}
           </div>
+
+          <SectionCard
+            title="Teammates to meet"
+            action={
+              <Link href="/dashboard/teammates" className="font-mono text-xs text-ink-muted hover:text-trust">
+                See all →
+              </Link>
+            }
+          >
+            {teammatePreview.length > 0 ? (
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {teammatePreview.map((t) => (
+                  <li key={t.userId}>
+                    <TeammateCard teammate={t} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty message="No other students have finished onboarding yet." />
+            )}
+          </SectionCard>
+
+          <SectionCard
+            title="Teams with an open slot"
+            action={
+              <Link href="/dashboard/teams" className="font-mono text-xs text-ink-muted hover:text-trust">
+                See all →
+              </Link>
+            }
+          >
+            {teamPreview.length > 0 ? (
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {teamPreview.map((t) => (
+                  <li key={t.id}>
+                    <TeamCard team={t} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty message="No teams have an open slot right now." />
+            )}
+          </SectionCard>
 
           <SectionCard
             title="Evidence checklist"

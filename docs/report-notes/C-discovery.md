@@ -14,3 +14,13 @@
 - **Manual checks pending:** browser check of the page signed in as two real accounts.
 - **Screenshots to take:** teammates page with filters applied; empty state.
 - **UML impact:** none beyond a `findTeammates` call in the discovery sequence.
+
+## C.3: Open teams listing and dashboard tiles  (2026-10-28, Claude)
+- **What was built:** `/dashboard/teams` lists real teams through `findOpenTeams` with a GET filter (hackathon select, skill slug input), 24 per page and a "Next page" link. The dashboard now shows real counts on its two tiles plus two three-card previews (teammates, open teams) with empty states. `lib/dashboard-fixtures.ts` and `SampleNote` are deleted. `TeamCard` takes `TeamCardData` and an `action` slot (empty until Task I.1; the old inert "Apply to join" button is gone).
+- **Query shape:** one `prisma.team.findMany`: hackathon `endsAt > now` (and `slug` if filtered), `members: { none: { userId: viewer } }`, `lookingFor: { has: skill }` if filtered, ordered by `createdAt desc, id asc`, selecting members' names and `_count.members`. One extra catalog lookup (`findSkillNames`) turns the page's `lookingFor` slugs into names; unknown slugs are dropped.
+- **Limit:** "has an open slot" means `_count.members < hackathon.teamSizeMax`, which Prisma cannot filter on. All candidate teams of unended hackathons are loaded, filtered in memory, then paged. Fine for a pilot; use raw SQL (`HAVING count(*) < teamSizeMax` with `LIMIT`) if team counts grow into the thousands.
+- **Files:** `lib/discovery.ts`, `app/(protected)/dashboard/{page.tsx,MatchCards.tsx,PageHeader.tsx}`, `app/(protected)/dashboard/teams/{page,Filters}.tsx`, `tests/integration/discovery-teams.test.ts`.
+- **Schema:** none.
+- **Tests:** 6 integration cases against a real DB: full team hidden, ended-hackathon team hidden, viewer's team excluded, skill and hackathon filters, `openSlots`/member names/skill names (unknown slug dropped), newest-first paging with `hasMore`.
+- **Manual checks pending:** browser check of `/dashboard/teams` and the dashboard previews; before/after screenshots of `/dashboard/teammates` and `/dashboard/teams` (sample data vs real).
+- **UML impact:** `findOpenTeams` joins the discovery sequence next to `findTeammates`.
