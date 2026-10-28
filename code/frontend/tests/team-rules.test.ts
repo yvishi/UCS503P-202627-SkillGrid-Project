@@ -134,7 +134,7 @@ describe("nextLead", () => {
   const m = (userId: string, role: "LEAD" | "MEMBER", day: number) => ({
     userId,
     role,
-    joinedAt: new Date(2026, 9, day),
+    joinedAt: new Date(`2026-10-${String(day).padStart(2, "0")}T00:00:00Z`),
   });
   it("hands over to the earliest-joined remaining member", () => {
     expect(nextLead([m("A", "LEAD", 1), m("C", "MEMBER", 3), m("B", "MEMBER", 2)], "A")).toBe("B");

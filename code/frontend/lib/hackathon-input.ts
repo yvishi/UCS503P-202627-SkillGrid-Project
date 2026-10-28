@@ -18,9 +18,12 @@ function parseSize(raw: string | undefined): number | null {
   return n >= 1 && n <= MAX_TEAM_SIZE ? n : null;
 }
 
+/** Hackathon times are entered in IST; a value with no explicit offset is read as Asia/Kolkata (+05:30). */
 function parseDate(raw: string | undefined): Date | null {
-  const text = (raw ?? "").trim();
+  let text = (raw ?? "").trim();
   if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) text += ":00+05:30";
+  else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(text)) text += "+05:30";
   const d = new Date(text);
   return Number.isNaN(d.getTime()) ? null : d;
 }

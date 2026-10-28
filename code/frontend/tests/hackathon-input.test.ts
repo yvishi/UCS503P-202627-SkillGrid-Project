@@ -25,6 +25,16 @@ describe("parseHackathonInput", () => {
     const r = parseHackathonInput({ ...form, slug: "  sih-26 " });
     expect(r.ok && r.value.slug).toBe("sih-26");
   });
+  it("reads a value with no offset as IST", () => {
+    const r = parseHackathonInput({ ...form, startsAt: "2026-11-01T10:00", endsAt: "2026-11-01T12:00:30" });
+    expect(r.ok && r.value.startsAt.toISOString()).toBe("2026-11-01T04:30:00.000Z");
+    expect(r.ok && r.value.endsAt.toISOString()).toBe("2026-11-01T06:30:30.000Z");
+  });
+  it("leaves a value with Z or an explicit offset unchanged", () => {
+    const r = parseHackathonInput({ ...form, startsAt: "2026-11-01T10:00:00Z", endsAt: "2026-11-01T18:00:00+01:00" });
+    expect(r.ok && r.value.startsAt.toISOString()).toBe("2026-11-01T10:00:00.000Z");
+    expect(r.ok && r.value.endsAt.toISOString()).toBe("2026-11-01T17:00:00.000Z");
+  });
   it("rejects short and long names", () => {
     const err = { ok: false, error: "The name must be 3 to 80 characters." };
     expect(parseHackathonInput({ ...form, name: "ab" })).toEqual(err);
