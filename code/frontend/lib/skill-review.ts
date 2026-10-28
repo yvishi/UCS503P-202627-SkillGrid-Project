@@ -35,7 +35,8 @@ export async function listReviewQueue(): Promise<QueueGroup[]> {
   }));
 }
 
-export type ReviewResult = { ok: true; message: string } | { ok: false; error: string };
+// userIds: users whose skills changed, so callers can recompute their scores.
+export type ReviewResult = { ok: true; message: string; userIds?: string[] } | { ok: false; error: string };
 
 const NOTHING_PENDING: ReviewResult = { ok: true, message: "Nothing pending for this skill any more." };
 
@@ -45,12 +46,12 @@ function people(n: number) {
 
 // Marks a group's pending reports resolved and gives every reporter the
 // skill at the level they asked for (skipping anyone who already has it).
-async function resolveGroup(db: Db, key: string, status: "APPROVED" | "MERGED", skillId: string): Promise<number> {
+async function resolveGroup(db: Db, key: string, status: "APPROVED" | "MERGED", skillId: string): Promise<string[]> {
   const pending = await db.skillRequest.findMany({
     where: { key, status: "PENDING" },
     select: { id: true, userId: true, requestedLevel: true },
   });
-  if (pending.length === 0) return 0;
+  if (pending.length === 0) return [];
   await db.skillRequest.updateMany({
     where: { id: { in: pending.map((p) => p.id) } },
     data: { status, resolvedSkillId: skillId, reviewedAt: new Date() },
@@ -59,7 +60,7 @@ async function resolveGroup(db: Db, key: string, status: "APPROVED" | "MERGED", 
     data: pending.map((p) => ({ userId: p.userId, skillId, level: p.requestedLevel })),
     skipDuplicates: true,
   });
-  return new Set(pending.map((p) => p.userId)).size;
+  return [...new Set(pending.map((p) => p.userId))];
 }
 
 export async function approveGroup(key: string, input: ApprovalInput): Promise<ReviewResult> {
@@ -81,8 +82,8 @@ export async function approveGroup(key: string, input: ApprovalInput): Promise<R
         data: { slug, name, aliases, keys, category, strictMatch, origin: "REQUESTED" },
         select: { id: true },
       });
-      const n = await resolveGroup(tx, key, "APPROVED", skill.id);
-      return { ok: true, message: `Added ${name} for ${people(n)}.` };
+      const userIds = await resolveGroup(tx, key, "APPROVED", skill.id);
+      return { ok: true, message: `Added ${name} for ${people(userIds.length)}.`, userIds };
     });
     if (result.ok) invalidateCatalog();
     return result;
@@ -123,8 +124,8 @@ export async function mergeGroup(key: string, targetSlug: string, addAlias: bool
         }
       }
 
-      const n = await resolveGroup(tx, key, "MERGED", target.id);
-      return { ok: true, message: `Merged into ${target.name} for ${people(n)}.` };
+      const userIds = await resolveGroup(tx, key, "MERGED", target.id);
+      return { ok: true, message: `Merged into ${target.name} for ${people(userIds.length)}.`, userIds };
     });
     if (result.ok) invalidateCatalog();
     return result;

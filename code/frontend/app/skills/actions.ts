@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { getEvidenceSnapshot } from "@/lib/evidence";
 import type { ReportInput, ReportResult } from "@/lib/skill-report-input";
 import { cancelReport, reportSkill } from "@/lib/skill-requests";
+import { recomputeUserScoresSafely } from "@/lib/skill-score";
 import type { EvidenceSnapshot } from "@/lib/skill-suggestions";
 import { isSkillRatingLevel, type UserSkillEntry } from "@/lib/skills";
 import { addUserSkill, removeUserSkill, setUserSkillLevel } from "@/lib/user-skills";
@@ -36,6 +37,7 @@ export async function addUserSkillAction(slug: string, level: string): Promise<S
   try {
     const skill = await addUserSkill(userId, slug, level);
     if (!skill) return { ok: false, error: "That skill isn't in the catalog." };
+    await recomputeUserScoresSafely(userId);
     revalidateSkillPages();
     return { ok: true, skill };
   } catch (err) {
@@ -50,6 +52,7 @@ export async function setUserSkillLevelAction(slug: string, level: string): Prom
   try {
     const skill = await setUserSkillLevel(userId, slug, level);
     if (!skill) return { ok: false, error: "You haven't added that skill." };
+    await recomputeUserScoresSafely(userId);
     revalidateSkillPages();
     return { ok: true, skill };
   } catch (err) {
@@ -62,6 +65,7 @@ export async function removeUserSkillAction(slug: string): Promise<{ ok: true } 
   const userId = await requireUserId();
   try {
     await removeUserSkill(userId, slug);
+    await recomputeUserScoresSafely(userId);
     revalidateSkillPages();
     return { ok: true };
   } catch (err) {
@@ -74,6 +78,8 @@ export async function reportSkillAction(input: ReportInput): Promise<ReportResul
   const userId = await requireUserId();
   try {
     const result = await reportSkill(userId, input);
+    // "exists" means the skill was added straight to the user's list.
+    if (result.status === "exists") await recomputeUserScoresSafely(userId);
     if (result.status !== "error") revalidateSkillPages();
     return result;
   } catch (err) {

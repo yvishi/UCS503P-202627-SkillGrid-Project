@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { processResumeUpload } from "@/lib/resume-upload";
+import { recomputeUserScoresSafely } from "@/lib/skill-score";
 
 async function requireUserId(): Promise<string> {
   const session = await auth();
@@ -59,6 +60,7 @@ export async function reuploadResumeAction(
     console.error("reuploadResumeAction save failed:", err);
     return { error: "Something went wrong saving your resume. Please try again." };
   }
+  await recomputeUserScoresSafely(userId);
 
   revalidatePath("/profile/resume");
   revalidatePath("/dashboard");
@@ -85,6 +87,7 @@ export async function selectResumeAction(evidenceId: string): Promise<ReuploadSt
     console.error("selectResumeAction failed:", err);
     return { error: "Something went wrong switching resumes. Please try again." };
   }
+  await recomputeUserScoresSafely(userId);
 
   revalidatePath("/profile/resume");
   revalidatePath("/dashboard");
