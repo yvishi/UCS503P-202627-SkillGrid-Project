@@ -3,6 +3,7 @@ import { findSkillNames } from "@/lib/skill-catalog";
 import {
   buildSkillGrid,
   githubSkillsFromPayload,
+  peerSkillsFromPayload,
   resumeSkillsFromPayload,
   type SkillGrid,
 } from "@/lib/skill-grid";
@@ -66,24 +67,37 @@ export async function findGithubPayload(userId: string): Promise<unknown> {
   return record?.payload ?? null;
 }
 
+export async function findPeerPayload(userId: string): Promise<unknown> {
+  const record = await prisma.evidenceRecord.findFirst({
+    where: { userId, source: "PEER_FEEDBACK" },
+    select: { payload: true },
+  });
+  return record?.payload ?? null;
+}
+
 // Everything the dashboard and profile grids need, in one place.
 export async function loadSkillGrid(
   userId: string,
   activeResumeId: string | null,
-): Promise<{ userSkills: UserSkillEntry[]; resumePayload: unknown; githubPayload: unknown; grid: SkillGrid }> {
-  const [userSkills, resumePayload, githubPayload] = await Promise.all([
+): Promise<{ userSkills: UserSkillEntry[]; resumePayload: unknown; githubPayload: unknown; peerPayload: unknown; grid: SkillGrid }> {
+  const [userSkills, resumePayload, githubPayload, peerPayload] = await Promise.all([
     getUserSkills(userId),
     findActiveResumePayload(userId, activeResumeId),
     findGithubPayload(userId),
+    findPeerPayload(userId),
   ]);
   const resumeSkills = resumeSkillsFromPayload(resumePayload);
   const githubSkills = githubSkillsFromPayload(githubPayload);
-  const skillNames = await findSkillNames([...new Set([...resumeSkills, ...githubSkills.map((s) => s.slug)])]);
+  const peerSkills = peerSkillsFromPayload(peerPayload);
+  const skillNames = await findSkillNames([
+    ...new Set([...resumeSkills, ...githubSkills.map((s) => s.slug), ...peerSkills.map((s) => s.slug)]),
+  ]);
   return {
     userSkills,
     resumePayload,
     githubPayload,
-    grid: buildSkillGrid({ userSkills, resumeSkills, githubSkills, skillNames }),
+    peerPayload,
+    grid: buildSkillGrid({ userSkills, resumeSkills, githubSkills, peerSkills, skillNames }),
   };
 }
 

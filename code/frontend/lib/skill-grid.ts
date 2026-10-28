@@ -55,6 +55,16 @@ export function githubSkillsFromPayload(payload: unknown): GithubEvidenceSkill[]
   return [];
 }
 
+/**
+ * Skills from a PEER_FEEDBACK EvidenceRecord payload:
+ * `{ version: 1, verified: true, skills: [{ slug, level }] }`. Anything else is empty.
+ */
+export function peerSkillsFromPayload(payload: unknown): GithubEvidenceSkill[] {
+  const p = payload as { verified?: unknown; version?: unknown; skills?: unknown } | null;
+  if (p?.verified !== true || p.version !== 1 || !Array.isArray(p.skills)) return [];
+  return p.skills.filter(isGithubEvidenceSkill).map(({ slug, level }) => ({ slug, level }));
+}
+
 export type SkillGrid = {
   columns: string[];
   selfColumn: number;
@@ -67,18 +77,21 @@ export function buildSkillGrid({
   userSkills,
   resumeSkills,
   githubSkills,
+  peerSkills = [],
   skillNames,
 }: {
   userSkills: readonly UserSkillEntry[];
   resumeSkills: readonly string[];
   githubSkills: readonly GithubEvidenceSkill[];
+  peerSkills?: readonly GithubEvidenceSkill[];
   /** Names for evidence-only slugs; slugs missing here (and not self-rated) are dropped. */
   skillNames: ReadonlyMap<string, string>;
 }): SkillGrid {
   const self = new Map(userSkills.map((s) => [s.slug, s]));
   const resume = new Set(resumeSkills);
   const github = new Map(githubSkills.map((s) => [s.slug, s.level]));
-  const slugs = new Set([...self.keys(), ...resume, ...github.keys()]);
+  const peer = new Map(peerSkills.map((s) => [s.slug, s.level]));
+  const slugs = new Set([...self.keys(), ...resume, ...github.keys(), ...peer.keys()]);
 
   const rows = [...slugs]
     .flatMap((slug) => {
@@ -89,7 +102,7 @@ export function buildSkillGrid({
         level ? SELF_LEVEL[level] : 0,
         resume.has(slug) ? RESUME_LEVEL : 0,
         github.get(slug) ?? 0,
-        0, // Peers: peer feedback isn't built yet.
+        peer.get(slug) ?? 0,
       ];
       const evidence = cells[1] + cells[2] + cells[3];
       return [{ name, cells, evidence, total: evidence + cells[0] }];
