@@ -7,7 +7,7 @@
 - **Manual checks pending:** none.
 
 ## A.2: Store scores and recompute on every evidence change  (2026-10-28, Claude)
-- **What was built:** Scores are stored in `skill_scores` (one row per user and skill, only scores above 0) and `profiles.evidenceScore`, so discovery sorts with a plain indexed query. `recomputeUserScores(userId)` loads evidence the way the skill grid does (active resume, GitHub, peers, self), skips slugs the catalog does not know, and replaces the user's rows in one transaction. It is called after every evidence write: GitHub connect, resume upload and switch, onboarding submit, skill add, level change and remove, and admin approve or merge of a reported skill (for every affected reporter). A backfill script fills existing users; `--check` compares stored against fresh values and exits 1 on a mismatch.
+- **What was built:** Scores are stored in `skill_scores` (one row per user and skill, only scores above 0) and `profiles.evidenceScore`, so discovery sorts with a plain indexed query. `recomputeUserScores(userId)` loads evidence the way the skill grid does (active resume, GitHub, peers, self), skips slugs the catalog does not know, and replaces the user's rows in one transaction. It is called after every evidence write: GitHub connect, resume upload and switch, onboarding submit, skill add, level change and remove, and reporting a skill that already exists in the catalog (it is added directly), and admin approve or merge of a reported skill (for every affected reporter). A backfill script fills existing users; `--check` compares stored against fresh values and exits 1 on a mismatch.
 - **Weights:**
 
 | Source | Weight | Strength | Max points |

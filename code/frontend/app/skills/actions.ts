@@ -78,6 +78,8 @@ export async function reportSkillAction(input: ReportInput): Promise<ReportResul
   const userId = await requireUserId();
   try {
     const result = await reportSkill(userId, input);
+    // "exists" means the skill was added straight to the user's list.
+    if (result.status === "exists") await recomputeUserScoresSafely(userId);
     if (result.status !== "error") revalidateSkillPages();
     return result;
   } catch (err) {

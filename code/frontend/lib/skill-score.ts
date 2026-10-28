@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { isUniqueViolation } from "@/lib/skill-catalog";
 import { findActiveResumePayload, findGithubPayload, findPeerPayload } from "@/lib/evidence";
 import { githubSkillsFromPayload, peerSkillsFromPayload, resumeSkillsFromPayload } from "@/lib/skill-grid";
 import { collectEvidence, profileScore, skillScore } from "@/lib/skill-score-core";
@@ -44,14 +45,22 @@ export async function computeUserScores(userId: string): Promise<ComputedScores>
  * still gets SkillScore rows but has no evidence score to store.
  */
 export async function recomputeUserScores(userId: string): Promise<{ evidenceScore: number; skills: number }> {
-  const { rows, evidenceScore } = await computeUserScores(userId);
-  await prisma.$transaction([
-    prisma.skillScore.deleteMany({ where: { userId } }),
-    prisma.skillScore.createMany({ data: rows.map((r) => ({ userId, ...r })) }),
-    prisma.profile.updateMany({ where: { userId }, data: { evidenceScore, scoreUpdatedAt: new Date() } }),
-  ]);
-
-  return { evidenceScore, skills: rows.length };
+  // Two concurrent recomputes can both delete, then both insert and collide
+  // on the (userId, skillId) key. Retry once, re-reading the evidence.
+  for (let attempt = 0; ; attempt++) {
+    const { rows, evidenceScore } = await computeUserScores(userId);
+    try {
+      await prisma.$transaction([
+        prisma.skillScore.deleteMany({ where: { userId } }),
+        prisma.skillScore.createMany({ data: rows.map((r) => ({ userId, ...r })) }),
+        prisma.profile.updateMany({ where: { userId }, data: { evidenceScore, scoreUpdatedAt: new Date() } }),
+      ]);
+      return { evidenceScore, skills: rows.length };
+    } catch (err) {
+      if (attempt === 0 && isUniqueViolation(err)) continue;
+      throw err;
+    }
+  }
 }
 
 /** For hook call sites: the evidence write has already committed, so a failed recompute must not fail the action. */
