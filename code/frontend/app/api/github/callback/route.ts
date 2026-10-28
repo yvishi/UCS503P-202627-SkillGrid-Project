@@ -11,6 +11,7 @@ import {
   sanitizeReturnTo,
   type GithubEvidencePayload,
 } from "@/lib/github";
+import { recomputeUserScoresSafely } from "@/lib/skill-score";
 
 // GET /api/github/callback -- GitHub redirects here after consent, with
 // ?code&state (or ?error on denial). Exchanges the code for a token
@@ -78,6 +79,8 @@ export async function GET(request: NextRequest) {
       });
       return created;
     });
+
+    await recomputeUserScoresSafely(userId);
 
     return finish("connected", { evidenceId: record.id, username: githubUser.login });
   } catch (err) {

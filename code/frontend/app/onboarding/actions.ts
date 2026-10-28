@@ -10,6 +10,7 @@ import {
   type AvailabilityOption,
 } from "@/lib/onboarding-options";
 import { processResumeUpload } from "@/lib/resume-upload";
+import { recomputeUserScoresSafely } from "@/lib/skill-score";
 import { countSkillsAndPendingReports } from "@/lib/user-skills";
 
 async function requireUserId(): Promise<string> {
@@ -186,6 +187,7 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
     console.error("submitOnboardingAction failed:", err);
     return { error: "Something went wrong saving your profile. Please try again." };
   }
+  await recomputeUserScoresSafely(userId);
 
   redirect("/dashboard");
 }
