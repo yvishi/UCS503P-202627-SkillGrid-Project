@@ -1,7 +1,8 @@
 import type { Prisma } from "@prisma/client";
 
-import { PAGE_SIZE, headline, type TeammateFilters } from "@/lib/discovery-core";
+import { PAGE_SIZE, headline, type TeamFilters, type TeammateFilters } from "@/lib/discovery-core";
 import { prisma } from "@/lib/prisma";
+import { findSkillNames } from "@/lib/skill-catalog";
 
 export type TeammateCardData = {
   userId: string;
@@ -110,5 +111,68 @@ export async function findTeammates(
   return {
     items: ranked.slice(start, start + PAGE_SIZE).map((r) => toCard(r.row)),
     hasMore: ranked.length > start + PAGE_SIZE,
+  };
+}
+
+export type TeamCardData = {
+  id: string;
+  name: string;
+  hackathonName: string;
+  hackathonSlug: string;
+  lookingFor: string[]; // skill display names, not slugs
+  members: string[];
+  openSlots: number;
+};
+
+// Teams of unended hackathons that still have a seat, newest first, never
+// including a team the viewer belongs to. The seat check compares the member
+// count with the hackathon's teamSizeMax, which Prisma cannot filter on, so
+// candidates are loaded and filtered here before paging. Fine at pilot scale.
+export async function findOpenTeams(
+  viewerId: string,
+  f: TeamFilters,
+): Promise<{ items: TeamCardData[]; hasMore: boolean }> {
+  const page = Number.isFinite(f.page) ? Math.max(1, Math.floor(f.page)) : 1;
+
+  const rows = await prisma.team.findMany({
+    where: {
+      hackathon: { endsAt: { gt: new Date() }, ...(f.hackathon ? { slug: f.hackathon } : {}) },
+      members: { none: { userId: viewerId } },
+      ...(f.skill ? { lookingFor: { has: f.skill } } : {}),
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      lookingFor: true,
+      hackathon: { select: { name: true, slug: true, teamSizeMax: true } },
+      members: {
+        orderBy: { joinedAt: "asc" },
+        select: { user: { select: { name: true } } },
+      },
+      _count: { select: { members: true } },
+    },
+  });
+
+  const open = rows.filter((t) => t._count.members < t.hackathon.teamSizeMax);
+  const start = (page - 1) * PAGE_SIZE;
+  const pageRows = open.slice(start, start + PAGE_SIZE);
+
+  const names = await findSkillNames([...new Set(pageRows.flatMap((t) => t.lookingFor))]);
+
+  return {
+    items: pageRows.map((t) => ({
+      id: t.id,
+      name: t.name,
+      hackathonName: t.hackathon.name,
+      hackathonSlug: t.hackathon.slug,
+      lookingFor: t.lookingFor.flatMap((slug) => {
+        const name = names.get(slug);
+        return name ? [name] : [];
+      }),
+      members: t.members.map((m) => m.user.name ?? "SkillGrid member"),
+      openSlots: t.hackathon.teamSizeMax - t._count.members,
+    })),
+    hasMore: open.length > start + PAGE_SIZE,
   };
 }
