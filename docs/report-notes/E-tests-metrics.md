@@ -22,3 +22,13 @@
 - **Screenshots to take:** terminal output of the script after the real pilot.
 - **UML impact:** none.
 - **CI run links:** see the PR checks.
+
+## I.2: Integration test gaps, scores and teammates discovery  (2026-10-28, Claude)
+- **What was built:** Two integration test files filling the gaps left after the stream tasks: `scores.test.ts` (5 tests) and `discovery.test.ts` (6 tests). No app code changed.
+- **Design decisions:** Skill scores are seeded directly with Prisma in discovery tests so ranking is tested independently of the scoring formula. The backfill `--check` script does not export its comparison, so the test repeats the same comparison against `computeUserScores`, and also checks that tampering is detected. The concurrency test uses only the safe variant, since the unsafe one may legitimately throw after its single retry.
+- **Files:** `code/frontend/tests/integration/{scores,discovery}.test.ts`.
+- **Schema:** none.
+- **Tests:** Integration tests: 31 before, 42 after (+11). Unit suite unchanged at 186. No bugs found.
+- **Numbers for the report:** 42 integration tests, about 8 s locally; stable over 3 consecutive runs.
+- **Manual checks pending:** none.
+- **UML impact:** none.
