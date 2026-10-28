@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canAccept, canCreateTeam, canInvite, canRequest, nextLead } from "@/lib/team-rules";
+import { canAccept, canCreateTeam, canInvite, canRequest, hackathonPhase, nextLead } from "@/lib/team-rules";
 
 const now = new Date("2026-11-01T10:00:00Z");
 const future = new Date("2026-12-01T10:00:00Z");
@@ -144,5 +144,21 @@ describe("nextLead", () => {
   });
   it("keeps the current lead when a plain member leaves", () => {
     expect(nextLead([m("A", "LEAD", 1), m("B", "MEMBER", 2)], "B")).toBe("A");
+  });
+});
+
+describe("hackathonPhase", () => {
+  const start = new Date("2026-11-10T04:30:00Z");
+  const end = new Date("2026-11-12T04:30:00Z");
+  it("is upcoming before the start", () => {
+    expect(hackathonPhase(new Date("2026-11-01T00:00:00Z"), start, end)).toBe("upcoming");
+  });
+  it("is running from the start up to the end", () => {
+    expect(hackathonPhase(start, start, end)).toBe("running");
+    expect(hackathonPhase(new Date("2026-11-11T00:00:00Z"), start, end)).toBe("running");
+  });
+  it("is ended at and after the end", () => {
+    expect(hackathonPhase(end, start, end)).toBe("ended");
+    expect(hackathonPhase(new Date("2026-12-01T00:00:00Z"), start, end)).toBe("ended");
   });
 });
