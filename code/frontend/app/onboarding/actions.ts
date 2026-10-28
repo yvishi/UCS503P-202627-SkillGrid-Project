@@ -10,13 +10,7 @@ import {
   type AvailabilityOption,
 } from "@/lib/onboarding-options";
 import { processResumeUpload } from "@/lib/resume-upload";
-import {
-  isSkillRatingLevel,
-  isSkillSlug,
-  mergeSkillRatings,
-  type SkillRatings,
-  type SkillSlug,
-} from "@/lib/skills";
+import { countSkillsAndPendingReports } from "@/lib/user-skills";
 
 async function requireUserId(): Promise<string> {
   const session = await auth();
@@ -44,7 +38,7 @@ async function requireUserId(): Promise<string> {
 export type ResumeCheckState =
   | { status: "idle" }
   | { status: "error"; reason: string }
-  | { status: "ok"; fileUrl: string; evidenceId: string; extractedSkills: SkillSlug[]; usedOcr: boolean };
+  | { status: "ok"; fileUrl: string; evidenceId: string; extractedSkills: string[]; usedOcr: boolean };
 
 export async function checkResumeAction(
   _prevState: ResumeCheckState,
@@ -101,7 +95,6 @@ export async function checkResumeAction(
 // than threading each step through its own FormData round-trip.
 // ---------------------------------------------------------------------------
 export type SubmitPayload = {
-  skillRatings: SkillRatings;
   interestTags: string[];
   availability: AvailabilityOption | null;
   projectLinks: string[];
@@ -118,15 +111,11 @@ function isAvailability(value: unknown): value is AvailabilityOption {
 export async function submitOnboardingAction(payload: SubmitPayload): Promise<SubmitState> {
   const userId = await requireUserId();
 
-  const skillRatings: SkillRatings = {};
-  for (const [slug, level] of Object.entries(payload.skillRatings)) {
-    if (!isSkillSlug(slug) || !level || !isSkillRatingLevel(level)) {
-      return { error: "Received an invalid skill rating." };
-    }
-    skillRatings[slug] = level;
-  }
-  if (Object.keys(skillRatings).length === 0) {
-    return { error: "Please rate at least one skill." };
+  // Skills are saved as they're picked (app/skills/actions.ts), so just
+  // confirm the user has at least one -- or one waiting for review.
+  const { skills, pendingReports } = await countSkillsAndPendingReports(userId);
+  if (skills + pendingReports === 0) {
+    return { error: "Please add at least one skill." };
   }
 
   if (!isAvailability(payload.availability)) {
@@ -158,10 +147,8 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
   // resumeEvidenceId/githubEvidenceId come from client state -- verify
   // they're actually this user's own records before trusting them, the
   // same check selectResumeAction makes
-  // (app/(protected)/profile/resume/actions.ts). The GitHub record itself
-  // was already created by the OAuth callback (app/api/github/callback) --
-  // this just confirms ownership and folds its languages into the final
-  // skillRatings, since that's the authoritative write for onboarding.
+  // (app/(protected)/profile/resume/actions.ts). Detected skills are
+  // evidence only; nothing is folded into self-ratings here.
   if (payload.resumeEvidenceId) {
     const record = await prisma.evidenceRecord.findUnique({ where: { id: payload.resumeEvidenceId } });
     if (!record || record.userId !== userId || record.source !== "RESUME") {
@@ -169,17 +156,11 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
     }
   }
 
-  let finalSkillRatings = skillRatings;
   if (payload.githubEvidenceId) {
     const record = await prisma.evidenceRecord.findUnique({ where: { id: payload.githubEvidenceId } });
     if (!record || record.userId !== userId || record.source !== "GITHUB") {
       return { error: "Invalid GitHub connection." };
     }
-    const githubPayload = record.payload as { languages?: string[] };
-    const languages = (githubPayload.languages ?? []).filter(
-      (s): s is SkillSlug => typeof s === "string" && isSkillSlug(s),
-    );
-    finalSkillRatings = mergeSkillRatings(finalSkillRatings, languages);
   }
 
   try {
@@ -187,7 +168,6 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
       where: { userId },
       create: {
         userId,
-        skillRatings: finalSkillRatings,
         availability: payload.availability!,
         interestTags,
         projectLinks,
@@ -195,7 +175,6 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
         onboardingCompletedAt: new Date(),
       },
       update: {
-        skillRatings: finalSkillRatings,
         availability: payload.availability!,
         interestTags,
         projectLinks,

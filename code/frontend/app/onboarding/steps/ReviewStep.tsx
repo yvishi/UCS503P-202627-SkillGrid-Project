@@ -1,38 +1,26 @@
 "use client";
 
 import { AVAILABILITY_LABELS, type AvailabilityOption } from "@/lib/onboarding-options";
-import {
-  SKILLS,
-  SKILL_RATING_LABELS,
-  SKILL_RATING_LEVELS,
-  skillLabel,
-  type SkillRatings,
-  type SkillSlug,
-} from "@/lib/skills";
+import { buildSkillGrid } from "@/lib/skill-grid";
+import type { OpenReport } from "@/lib/skill-report-input";
+import type { EvidenceSnapshot } from "@/lib/skill-suggestions";
+import { SKILL_RATING_LABELS, type UserSkillEntry } from "@/lib/skills";
 import { Empty, Eyebrow, Pill, PrimaryButton, TrustBadge } from "@/app/ui/primitives";
-import { EvidenceGrid, GridLegend, type CellLevel, type GridRow } from "@/app/ui/EvidenceGrid";
+import { EvidenceGrid, GridLegend } from "@/app/ui/EvidenceGrid";
 import type { StepKey } from "../Stepper";
 
 import { ArrowRight, StepCard, StepFooter, StepHeading } from "./StepShell";
 
-// Self-rating -> grid cell strength (amber). Kept below the top level so a
-// self-report never reads as strong as real evidence would.
-const SELF_LEVEL: Record<(typeof SKILL_RATING_LEVELS)[number], CellLevel> = {
-  BEGINNER: 1,
-  INTERMEDIATE: 2,
-  ADVANCED: 3,
-};
-// A keyword match on the resume is one solid piece of evidence.
-const RESUME_LEVEL: CellLevel = 3;
-
-// Spec sections 4.7 / 5.6: an editable summary of everything collected so
-// far, plus (Path A only) the resume-extracted skill tags reconciled here.
+// Spec section 5.2: a summary of everything collected so far. Skills are
+// already saved (the picker writes as you go), so this only previews them
+// on the grid beside what the resume and GitHub found. Detected skills are
+// evidence, not ratings -- nothing is reconciled into ratings here.
 export function ReviewStep({
   hasResume,
   resumeUsedOcr,
-  resumeSkills,
-  onResumeSkillsChange,
-  skillRatings,
+  skills,
+  reports,
+  evidence,
   interestTags,
   availability,
   projectLinks,
@@ -45,9 +33,9 @@ export function ReviewStep({
 }: {
   hasResume: boolean;
   resumeUsedOcr: boolean;
-  resumeSkills: SkillSlug[];
-  onResumeSkillsChange: (next: SkillSlug[]) => void;
-  skillRatings: SkillRatings;
+  skills: UserSkillEntry[];
+  reports: OpenReport[];
+  evidence: EvidenceSnapshot | null;
   interestTags: string[];
   availability: AvailabilityOption | null;
   projectLinks: string[];
@@ -58,53 +46,49 @@ export function ReviewStep({
   isSubmitting: boolean;
   error: string | null;
 }) {
-  const addableSkills = SKILLS.filter((s) => !resumeSkills.includes(s.slug));
-
-  // Grid preview: every skill that is rated or on the resume, in the fixed
-  // list order. Self column from ratings (amber), Resume column on Path A.
-  const columns = hasResume ? ["Self", "Resume"] : ["Self"];
-  const rows: GridRow[] = SKILLS.filter((s) => skillRatings[s.slug] || (hasResume && resumeSkills.includes(s.slug))).map(
-    (s) => {
-      const rating = skillRatings[s.slug];
-      const self: CellLevel = rating ? SELF_LEVEL[rating] : 0;
-      return {
-        label: s.label,
-        cells: hasResume ? [self, resumeSkills.includes(s.slug) ? RESUME_LEVEL : 0] : [self],
-      };
-    },
-  );
-  const ratedEntries = (Object.entries(skillRatings) as [SkillSlug, keyof typeof SKILL_RATING_LABELS][]).filter(
-    ([, level]) => !!level,
-  );
+  const names = new Map(Object.entries(evidence?.names ?? {}));
+  const grid = buildSkillGrid({
+    userSkills: skills,
+    resumeSkills: evidence?.resume ?? [],
+    githubSkills: evidence?.github ?? [],
+    skillNames: names,
+  });
+  const pendingReports = reports.filter((r) => r.status === "PENDING");
+  const resumeSkillNames = (evidence?.resume ?? []).flatMap((slug) => names.get(slug) ?? []);
 
   return (
     <StepCard>
       <StepHeading title="Review and submit" description="Check everything below, then submit your profile." />
 
       <div className="flex flex-col gap-4 px-5 pb-6 sm:px-7">
-        <ReviewRow label="Your grid so far" onEdit={() => onEditStep("skills")} editLabel="Edit ratings">
-          {rows.length > 0 ? (
+        <ReviewRow label="Your grid so far" onEdit={() => onEditStep("skills")} editLabel="Edit skills">
+          {grid.rows.length > 0 ? (
             <div className="flex flex-col gap-4">
               <EvidenceGrid
-                columns={columns}
-                rows={rows}
-                selfColumn={0}
+                columns={grid.columns}
+                rows={grid.rows}
+                selfColumn={grid.selfColumn}
                 size="md"
-                caption="Preview of your skill grid: self-rated level and resume evidence for each skill"
+                caption="Preview of your skill grid: your rating next to resume and GitHub evidence for each skill"
               />
               <GridLegend />
-              {ratedEntries.length > 0 && (
+              {skills.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {ratedEntries.map(([slug, level]) => (
-                    <Pill key={slug} tone="warm">
-                      {skillLabel(slug)} · {SKILL_RATING_LABELS[level]}
+                  {skills.map((s) => (
+                    <Pill key={s.slug} tone="warm">
+                      {s.name} · {SKILL_RATING_LABELS[s.level]}
                     </Pill>
                   ))}
                 </div>
               )}
             </div>
           ) : (
-            <Empty message="No skills yet. Rate a few so your grid has something on it." />
+            <Empty message="No skills yet. Add a few so your grid has something on it." />
+          )}
+          {pendingReports.length > 0 && (
+            <p className="mt-3 text-xs text-ink-muted">
+              Waiting for review: {pendingReports.map((r) => r.rawName).join(", ")}. They join your grid once approved.
+            </p>
           )}
         </ReviewRow>
 
@@ -113,49 +97,18 @@ export function ReviewStep({
             label={resumeUsedOcr ? "From your resume (scanned with OCR)" : "From your resume"}
             aside={<TrustBadge>Evidence</TrustBadge>}
           >
-            <div className="flex flex-wrap gap-2">
-              {resumeSkills.map((slug) => (
-                <span
-                  key={slug}
-                  className="inline-flex items-center gap-1.5 rounded-theme-sm border border-trust/25 bg-trust/10 py-0.5 pl-2 pr-1 text-xs font-medium text-trust-strong"
-                >
-                  <span aria-hidden="true" className="h-2 w-2 rounded-[2px] bg-trust" />
-                  {skillLabel(slug)}
-                  <button
-                    type="button"
-                    onClick={() => onResumeSkillsChange(resumeSkills.filter((s) => s !== slug))}
-                    aria-label={`Remove ${skillLabel(slug)}`}
-                    className="flex h-5 w-5 items-center justify-center rounded-[4px] text-trust-strong/70 transition hover:bg-danger/10 hover:text-danger"
-                  >
-                    <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <path strokeLinecap="round" d="M5 5l10 10M15 5L5 15" />
-                    </svg>
-                  </button>
-                </span>
-              ))}
-              {resumeSkills.length === 0 && (
-                <Empty message="No skills found on your resume. Add any it should have picked up below." />
-              )}
-            </div>
-            {addableSkills.length > 0 && (
-              <select
-                aria-label="Add a skill from your resume"
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) onResumeSkillsChange([...resumeSkills, e.target.value as SkillSlug]);
-                  e.target.value = "";
-                }}
-                className="mt-3 rounded-theme-sm border border-border-strong bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:border-ink"
-              >
-                <option value="" disabled>
-                  + Add a skill
-                </option>
-                {addableSkills.map((s) => (
-                  <option key={s.slug} value={s.slug}>
-                    {s.label}
-                  </option>
+            {evidence === null ? (
+              <Empty message="Loading…" />
+            ) : resumeSkillNames.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {resumeSkillNames.map((name) => (
+                  <Pill key={name} tone="trust">
+                    {name}
+                  </Pill>
                 ))}
-              </select>
+              </div>
+            ) : (
+              <Empty message="No skills found on your resume. Add them yourself in the skills step." />
             )}
           </ReviewRow>
         )}

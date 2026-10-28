@@ -3,16 +3,17 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getEvidenceStatus } from "@/lib/evidence";
+import { getEvidenceStatus, loadSkillGrid } from "@/lib/evidence";
 import { AVAILABILITY_LABELS } from "@/lib/onboarding-options";
 
 import { Avatar } from "@/app/ui/Avatar";
 import { ConnectGithubButton, GithubConnectionBanner } from "@/app/ui/ConnectGithubButton";
-import { EvidenceGrid, GridLegend } from "@/app/ui/EvidenceGrid";
+import { GridLegend } from "@/app/ui/EvidenceGrid";
+import { ExpandableEvidenceGrid } from "@/app/ui/ExpandableEvidenceGrid";
 import { Reveal } from "@/app/ui/motion";
 import { Empty, Eyebrow, Pill, SectionCard, TrustBadge, buttonBase, secondaryButtonClass } from "@/app/ui/primitives";
 
-import { buildSkillGrid, githubSkillsFromPayload } from "@/lib/skill-grid";
+import { githubSkillsFromPayload } from "@/lib/skill-grid";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Profile",
@@ -58,18 +59,15 @@ export default async function ProfilePage({
         })
       : null);
 
-  const grid = buildSkillGrid({
-    skillRatings: profile.skillRatings,
-    resumePayload: resumeRecord?.payload,
-    githubPayload: githubRecord?.payload,
-  });
+  const { grid } = await loadSkillGrid(userId, profile.activeResumeId);
 
   const name = session.user?.name ?? session.user?.email ?? "Your profile";
   const email = session.user?.email ?? "";
   const image = session.user?.image ?? null;
 
   const resumeFilename = (resumeRecord?.payload as { filename?: string } | undefined)?.filename ?? "resume.pdf";
-  const githubPayload = githubRecord?.payload as { repoCount?: number } | undefined;
+  const githubPayload = githubRecord?.payload as { repoCount?: number; reposScanned?: number } | undefined;
+  const reposScanned = githubPayload?.reposScanned ?? githubPayload?.repoCount;
   const githubSkillCount = githubSkillsFromPayload(githubRecord?.payload).length;
 
   return (
@@ -118,15 +116,23 @@ export default async function ProfilePage({
             <h2 id="skills-heading">
               <Eyebrow>Skills × evidence</Eyebrow>
             </h2>
-            {grid.rows.length > 0 && (
-              <span className="font-mono text-xs text-ink-muted tabular-nums">
-                {grid.backedCount} of {grid.rows.length} backed by evidence
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {grid.rows.length > 0 && (
+                <span className="font-mono text-xs text-ink-muted tabular-nums">
+                  {grid.backedCount} of {grid.rows.length} backed by evidence
+                </span>
+              )}
+              <Link
+                href="/profile/skills"
+                className="rounded-theme-sm text-xs font-semibold text-trust underline underline-offset-4 hover:text-trust-strong"
+              >
+                Edit skills
+              </Link>
+            </div>
           </div>
           <div className="bg-graph p-5 sm:p-6">
             {grid.rows.length > 0 ? (
-              <EvidenceGrid
+              <ExpandableEvidenceGrid
                 columns={grid.columns}
                 rows={grid.rows}
                 selfColumn={grid.selfColumn}
@@ -134,7 +140,7 @@ export default async function ProfilePage({
                 caption="Your skills against each evidence source: self-rating, resume, GitHub and peers"
               />
             ) : (
-              <Empty message="No skills yet. Upload a resume or connect GitHub and they'll appear here." />
+              <Empty message="No skills yet. Add some, upload a resume or connect GitHub and they'll appear here." />
             )}
           </div>
           <div className="flex flex-col gap-2 border-t border-border px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -237,12 +243,12 @@ export default async function ProfilePage({
               githubConnected ? (
                 <span className="font-mono">
                   {profile.githubUsername && <span className="text-ink">@{profile.githubUsername}</span>}
-                  {typeof githubPayload?.repoCount === "number" &&
-                    ` · ${githubPayload.repoCount} ${githubPayload.repoCount === 1 ? "repo" : "repos"} scanned`}
+                  {typeof reposScanned === "number" &&
+                    ` · ${reposScanned} ${reposScanned === 1 ? "repo" : "repos"} scanned`}
                   {` · ${githubSkillCount} ${githubSkillCount === 1 ? "skill" : "skills"} matched`}
                 </span>
               ) : (
-                "Connect GitHub and the languages in your own repositories count as evidence."
+                "Connect GitHub and the languages and topics in your own repositories count as evidence."
               )
             }
             action={
