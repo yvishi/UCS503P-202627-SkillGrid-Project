@@ -85,3 +85,11 @@ export function nextLead(
   const earliest = [...remaining].sort((x, y) => x.joinedAt.getTime() - y.joinedAt.getTime())[0];
   return earliest.userId;
 }
+
+export type HackathonPhase = "upcoming" | "running" | "ended";
+
+/** Where `now` falls against the hackathon window. `endsAt` itself counts as ended, as in the rules above. */
+export function hackathonPhase(now: Date, startsAt: Date, endsAt: Date): HackathonPhase {
+  if (hasEnded(now, endsAt)) return "ended";
+  return now.getTime() < startsAt.getTime() ? "upcoming" : "running";
+}
