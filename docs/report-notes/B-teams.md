@@ -10,3 +10,16 @@
 - **Problems hit:** `new Date("2026-11-01T10:00")` depends on the server timezone -> append an explicit +05:30 offset.
 - **Screenshots to take:** none.
 - **UML impact:** none (activity diagram for team formation can cite these rules).
+
+## B.2: Admin hackathon management  (2026-10-28, Claude)
+- **What was built:** An admin-only page at `/admin/hackathons` with a create form (name, optional slug, start and end as datetime-local in IST, smallest and largest team) and a list of hackathons showing dates in Asia/Kolkata, team size range and team count. A duplicate name shows "A hackathon with that name already exists."; non-admins get a 404 on the page and "Not allowed." from the action.
+- **Design decisions:** `createdById` comes from `getAdminUser()` inside the action, never from the form (rejected: hidden field, forgeable). The list is ordered by `startsAt` descending because `Hackathon` has no `createdAt` column and only Task 0.1 may change the schema. Slug collisions are caught through `isUniqueViolation` rather than a pre-check, so two concurrent creates cannot both pass. The admin layout has no nav list, so no link was added.
+- **Files:** code/frontend/app/admin/hackathons/page.tsx, actions.ts, HackathonForm.tsx; tests/integration/admin-hackathons.test.ts.
+- **Schema:** none (reads and writes `Hackathon`).
+- **Tests:** 1 integration file, 4 tests: admin creates (IST stored as UTC, createdById set), duplicate name, non-admin writes no row, invalid dates return the parser error.
+- **Numbers for the report:** about 190 lines of code, 4 integration tests added.
+- **Problems hit:** none.
+- **Screenshots to take:** `/admin/hackathons` with the form and a created "HackThapar 2026"; the duplicate-name error.
+- **UML impact:** use case diagram gains "Create hackathon" for the admin actor.
+
+Manual checks pending: render of the page in a browser and the non-admin 404 (covered by the layout and page guards, not run in a browser).
