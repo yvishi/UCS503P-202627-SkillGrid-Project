@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/hackathons", label: "Hackathons" },
+  { href: "/invites", label: "Invites" },
   { href: "/profile", label: "Profile" },
 ];
 
@@ -15,7 +16,8 @@ function isActive(pathname: string, href: string) {
 
 // Active state is drawn as a filled evidence cell under the label, so the
 // nav speaks the same visual language as the grid.
-export function NavLinks({ className = "" }: { className?: string }) {
+// `pendingInvites` is counted on the server (NavBar) and shown next to "Invites".
+export function NavLinks({ className = "", pendingInvites = 0 }: { className?: string; pendingInvites?: number }) {
   const pathname = usePathname() ?? "";
 
   return (
@@ -39,6 +41,12 @@ export function NavLinks({ className = "" }: { className?: string }) {
                   }`}
                 />
                 {label}
+                {href === "/invites" && pendingInvites > 0 && (
+                  <span className="rounded-theme-sm bg-trust px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-on-trust">
+                    {pendingInvites}
+                    <span className="sr-only"> pending</span>
+                  </span>
+                )}
               </Link>
             </li>
           );

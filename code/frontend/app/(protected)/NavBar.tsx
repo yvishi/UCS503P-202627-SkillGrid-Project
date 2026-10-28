@@ -4,6 +4,7 @@ import { auth, signOut } from "@/auth";
 import { Avatar } from "@/app/ui/Avatar";
 import { SecondaryButton } from "@/app/ui/primitives";
 import { ThemeToggle } from "@/app/ui/ThemeToggle";
+import { countPendingForUser } from "@/lib/teams";
 
 import { NavLinks } from "./NavLinks";
 
@@ -24,6 +25,7 @@ export async function NavBar() {
   const session = await auth();
   const user = session?.user;
   const displayName = user?.name ?? user?.email ?? "You";
+  const pendingInvites = user?.id ? await countPendingForUser(user.id) : 0;
 
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
@@ -37,7 +39,7 @@ export async function NavBar() {
             <CellMark />
             <span className="font-display text-base font-bold tracking-tight">SkillGrid</span>
           </Link>
-          <NavLinks className="hidden sm:block" />
+          <NavLinks className="hidden sm:block" pendingInvites={pendingInvites} />
         </div>
 
         {user && (
@@ -60,7 +62,7 @@ export async function NavBar() {
 
       {/* Mobile: links get their own row so nothing has to squeeze at 375px. */}
       <div className="border-t border-border px-2 py-1 sm:hidden">
-        <NavLinks />
+        <NavLinks pendingInvites={pendingInvites} />
       </div>
     </header>
   );
