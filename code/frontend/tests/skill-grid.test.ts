@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSkillGrid, githubSkillsFromPayload, resumeSkillsFromPayload } from "@/lib/skill-grid";
+import { buildSkillGrid, githubSkillsFromPayload, peerSkillsFromPayload, resumeSkillsFromPayload } from "@/lib/skill-grid";
 import type { UserSkillEntry } from "@/lib/skills";
 
 const NAMES = new Map([
@@ -78,5 +78,31 @@ describe("githubSkillsFromPayload", () => {
 
   it("ignores unverified connections", () => {
     expect(githubSkillsFromPayload({ verified: false, languages: ["python"] })).toEqual([]);
+  });
+});
+
+describe("peer evidence", () => {
+  it("fills the Peers column from peer evidence", () => {
+    const grid = buildSkillGrid({
+      userSkills: [],
+      resumeSkills: [],
+      githubSkills: [],
+      peerSkills: [{ slug: "react", level: 3 }],
+      skillNames: new Map([["react", "React"]]),
+    });
+    expect(grid.rows).toEqual([{ label: "React", cells: [0, 0, 0, 3] }]);
+    expect(grid.backedCount).toBe(1);
+  });
+
+  it("reads a verified peer payload", () => {
+    expect(peerSkillsFromPayload({ version: 1, verified: true, skills: [{ slug: "a", level: 3 }] })).toEqual([
+      { slug: "a", level: 3 },
+    ]);
+  });
+
+  it("ignores unverified or malformed peer payloads", () => {
+    expect(peerSkillsFromPayload(null)).toEqual([]);
+    expect(peerSkillsFromPayload({ version: 1, verified: false, skills: [{ slug: "a", level: 3 }] })).toEqual([]);
+    expect(peerSkillsFromPayload({ version: 1, verified: true, skills: [{ slug: "a", level: 7 }] })).toEqual([]);
   });
 });
