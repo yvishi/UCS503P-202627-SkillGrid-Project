@@ -21,7 +21,7 @@ const dateFormat = new Intl.DateTimeFormat("en-IN", {
 export default async function AdminHackathonsPage() {
   if (!(await getAdminUser())) notFound();
   const hackathons = await prisma.hackathon.findMany({
-    orderBy: { startsAt: "desc" },
+    orderBy: { createdAt: "desc" },
     include: { _count: { select: { teams: true } } },
   });
 
