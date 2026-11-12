@@ -75,3 +75,46 @@ export function headline(skills: readonly { name: string; score: number }[]): st
     .map((s) => s.name)
     .join(" · ");
 }
+
+export type LeadTeamOption = { id: string; name: string; hackathonName: string };
+
+export type InviteChoice =
+  | { kind: "no-team" } // the viewer leads no team in an unended hackathon
+  | { kind: "done" } // every team they lead already has an open invite or request with this person
+  | { kind: "one"; team: LeadTeamOption }
+  | { kind: "many"; teams: LeadTeamOption[] };
+
+/**
+ * Decides what the Invite control on a teammate card shows, given the teams the viewer leads
+ * and the ones that already have a pending row with the person on the card.
+ */
+export function inviteChoice(
+  leadTeams: readonly LeadTeamOption[],
+  pendingTeamIds: readonly string[],
+): InviteChoice {
+  if (leadTeams.length === 0) return { kind: "no-team" };
+  const open = leadTeams.filter((t) => !pendingTeamIds.includes(t.id));
+  if (open.length === 0) return { kind: "done" };
+  if (open.length === 1) return { kind: "one", team: open[0] };
+  return { kind: "many", teams: open };
+}
+
+export type JoinState = "open" | "requested" | "invited" | "in-hackathon";
+
+/**
+ * What the Request to join control on a team card shows. Being in a team for the hackathon wins,
+ * since neither a request nor accepting an invite can succeed then.
+ */
+export function joinState(
+  team: { id: string; hackathonSlug: string },
+  viewer: {
+    memberHackathonSlugs: readonly string[];
+    requestedTeamIds: readonly string[];
+    invitedTeamIds: readonly string[];
+  },
+): JoinState {
+  if (viewer.memberHackathonSlugs.includes(team.hackathonSlug)) return "in-hackathon";
+  if (viewer.invitedTeamIds.includes(team.id)) return "invited";
+  if (viewer.requestedTeamIds.includes(team.id)) return "requested";
+  return "open";
+}

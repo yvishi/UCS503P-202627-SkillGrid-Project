@@ -503,6 +503,36 @@ export async function myLeadTeams(userId: string): Promise<{ id: string; name: s
   return rows.map((r) => ({ id: r.team.id, name: r.team.name, hackathonName: r.hackathon.name }));
 }
 
+/**
+ * Open invites and requests between teams this user leads and other people, for the
+ * teammate cards: one { teamId, userId } per PENDING row, either kind. Any pending row
+ * blocks a new invite for that pair, so the card treats both kinds as "already invited".
+ */
+export async function pendingWithLeadTeams(userId: string): Promise<{ teamId: string; userId: string }[]> {
+  return prisma.teamInvite.findMany({
+    where: { status: "PENDING", team: { members: { some: { userId, role: "LEAD" } } } },
+    select: { teamId: true, userId: true },
+  });
+}
+
+/**
+ * What the team cards need about the viewer: the hackathons they already have a team in
+ * (by slug), and their PENDING rows by team, split into requests they sent and invites to them.
+ */
+export async function joinStateForUser(
+  userId: string,
+): Promise<{ memberHackathonSlugs: string[]; requestedTeamIds: string[]; invitedTeamIds: string[] }> {
+  const [memberships, pending] = await Promise.all([
+    prisma.teamMember.findMany({ where: { userId }, select: { hackathon: { select: { slug: true } } } }),
+    prisma.teamInvite.findMany({ where: { userId, status: "PENDING" }, select: { teamId: true, kind: true } }),
+  ]);
+  return {
+    memberHackathonSlugs: memberships.map((m) => m.hackathon.slug),
+    requestedTeamIds: pending.filter((p) => p.kind === "REQUEST").map((p) => p.teamId),
+    invitedTeamIds: pending.filter((p) => p.kind === "INVITE").map((p) => p.teamId),
+  };
+}
+
 export type InviteListRow = {
   id: string;
   kind: "INVITE" | "REQUEST";

@@ -7,6 +7,8 @@ import { Empty } from "@/app/ui/primitives";
 import { findTeammates } from "@/lib/discovery";
 import { parseTeammateFilters } from "@/lib/discovery-core";
 import { prisma } from "@/lib/prisma";
+import { myLeadTeams, pendingWithLeadTeams } from "@/lib/teams";
+import { InviteButton } from "../InviteButton";
 import { TeammateCard } from "../MatchCards";
 import { PageHeader } from "../PageHeader";
 import { Filters } from "./Filters";
@@ -25,14 +27,22 @@ export default async function TeammatesPage({
   const viewerId = session.user!.id!;
   const filters = parseTeammateFilters(await searchParams);
 
-  const [{ items, hasMore }, hackathons] = await Promise.all([
+  const [{ items, hasMore }, hackathons, leadTeams, pendingRows] = await Promise.all([
     findTeammates(viewerId, filters),
     prisma.hackathon.findMany({
       where: { endsAt: { gt: new Date() } },
       orderBy: { startsAt: "asc" },
       select: { slug: true, name: true },
     }),
+    myLeadTeams(viewerId),
+    pendingWithLeadTeams(viewerId),
   ]);
+
+  // Teams of the viewer's that already have an open invite or request with each person.
+  const pendingByUser = new Map<string, string[]>();
+  for (const row of pendingRows) {
+    pendingByUser.set(row.userId, [...(pendingByUser.get(row.userId) ?? []), row.teamId]);
+  }
 
   const next = new URLSearchParams();
   for (const s of filters.skills) next.append("skill", s);
@@ -58,7 +68,16 @@ export default async function TeammatesPage({
           {items.map((teammate, i) => (
             <li key={teammate.userId}>
               <Reveal delay={Math.min(i, 8) * 0.06} className="h-full">
-                <TeammateCard teammate={teammate} />
+                <TeammateCard
+                  teammate={teammate}
+                  action={
+                    <InviteButton
+                      userId={teammate.userId}
+                      teams={leadTeams}
+                      pendingTeamIds={pendingByUser.get(teammate.userId) ?? []}
+                    />
+                  }
+                />
               </Reveal>
             </li>
           ))}

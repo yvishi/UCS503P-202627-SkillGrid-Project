@@ -5,10 +5,12 @@ import { auth } from "@/auth";
 import { Reveal } from "@/app/ui/motion";
 import { Empty } from "@/app/ui/primitives";
 import { findOpenTeams } from "@/lib/discovery";
-import { parseTeamFilters } from "@/lib/discovery-core";
+import { joinState, parseTeamFilters } from "@/lib/discovery-core";
 import { prisma } from "@/lib/prisma";
+import { joinStateForUser } from "@/lib/teams";
 import { TeamCard } from "../MatchCards";
 import { PageHeader } from "../PageHeader";
+import { RequestJoinButton } from "../RequestJoinButton";
 import { Filters } from "./Filters";
 
 export const metadata: Metadata = {
@@ -25,13 +27,14 @@ export default async function TeamsPage({
   const viewerId = session.user!.id!;
   const filters = parseTeamFilters(await searchParams);
 
-  const [{ items, hasMore }, hackathons] = await Promise.all([
+  const [{ items, hasMore }, hackathons, viewerState] = await Promise.all([
     findOpenTeams(viewerId, filters),
     prisma.hackathon.findMany({
       where: { endsAt: { gt: new Date() } },
       orderBy: { startsAt: "asc" },
       select: { slug: true, name: true },
     }),
+    joinStateForUser(viewerId),
   ]);
 
   const next = new URLSearchParams();
@@ -56,7 +59,10 @@ export default async function TeamsPage({
           {items.map((team, i) => (
             <li key={team.id}>
               <Reveal delay={Math.min(i, 8) * 0.06} className="h-full">
-                <TeamCard team={team} />
+                <TeamCard
+                  team={team}
+                  action={<RequestJoinButton teamId={team.id} state={joinState(team, viewerState)} />}
+                />
               </Reveal>
             </li>
           ))}
