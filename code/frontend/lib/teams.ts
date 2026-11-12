@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { findSkillByText, isUniqueViolation } from "@/lib/skill-catalog";
 import {
   canAccept,
+  canInvite,
+  canRequest,
   canCreateTeam,
   hackathonPhase,
   nextLead,
@@ -313,5 +315,274 @@ export async function getHackathonView(userId: string, slug: string): Promise<Ha
     myTeam,
     lookingForTeam: participation?.lookingForTeam ?? false,
     phase: hackathonPhase(new Date(), hackathon.startsAt, hackathon.endsAt),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Invitations and join requests (B.4)
+//
+// A TeamInvite row is always about the person who would join (`userId`).
+//   INVITE:  the lead asked userId to join. Only userId accepts or declines.
+//   REQUEST: userId asked to join.          Only the team's current lead accepts or declines.
+// Only the creator (`createdById`) may cancel a PENDING row.
+
+const NOT_OPEN = "This invite is no longer open.";
+const NO_INVITE = "That invite no longer exists.";
+const CANT_RESPOND = "You can't respond to this one.";
+
+type Db = Tx | typeof prisma;
+type InviteFacts = { kind: "INVITE" | "REQUEST"; userId: string; teamId: string };
+
+async function isOnboarded(db: Db, userId: string): Promise<boolean> {
+  const profile = await db.profile.findUnique({ where: { userId }, select: { onboardingCompletedAt: true } });
+  return profile?.onboardingCompletedAt != null;
+}
+
+async function isLead(db: Db, teamId: string, userId: string): Promise<boolean> {
+  const row = await db.teamMember.findUnique({ where: { teamId_userId: { teamId, userId } }, select: { role: true } });
+  return row?.role === "LEAD";
+}
+
+/** INVITE: only the invitee may answer. REQUEST: only the team's current lead may answer. */
+async function mayRespond(db: Db, invite: InviteFacts, actorId: string): Promise<boolean> {
+  if (invite.kind === "INVITE") return invite.userId === actorId;
+  return isLead(db, invite.teamId, actorId);
+}
+
+/** Any PENDING row for (team, user), of either kind. */
+async function pendingFor(db: Db, teamId: string, userId: string): Promise<boolean> {
+  const row = await db.teamInvite.findFirst({ where: { teamId, userId, status: "PENDING" }, select: { id: true } });
+  return row !== null;
+}
+
+/**
+ * The team's lead invites `targetId`. The team row is locked so two invites (or an invite and a
+ * request) for the same person cannot both pass the "one pending row" check.
+ */
+export async function inviteToTeam(actorId: string, teamId: string, targetId: string): Promise<RuleResult> {
+  return prisma.$transaction(async (tx) => {
+    const team = await lockTeam(tx, teamId);
+    if (!team) return fail(NO_TEAM);
+    const [size, actorIsLead, targetRow, pendingExists] = await Promise.all([
+      tx.teamMember.count({ where: { teamId: team.id } }),
+      isLead(tx, team.id, actorId),
+      tx.teamMember.findUnique({
+        where: { hackathonId_userId: { hackathonId: team.hackathonId, userId: targetId } },
+        select: { teamId: true },
+      }),
+      pendingFor(tx, team.id, targetId),
+    ]);
+    const rule = canInvite({
+      now: new Date(),
+      team: { size, max: team.hackathon.teamSizeMax, endsAt: team.hackathon.endsAt },
+      actorIsLead,
+      targetInTeam: targetRow !== null,
+      pendingExists,
+      targetIsSelf: targetId === actorId,
+    });
+    if (!rule.ok) return rule;
+    if (!(await isOnboarded(tx, targetId))) {
+      return fail("You can only invite people who have finished setting up their profile.");
+    }
+    await tx.teamInvite.create({
+      data: { teamId: team.id, hackathonId: team.hackathonId, userId: targetId, kind: "INVITE", createdById: actorId },
+    });
+    return { ok: true };
+  });
+}
+
+/** The user asks to join the team. Locked for the same reason as inviteToTeam. */
+export async function requestToJoin(userId: string, teamId: string): Promise<RuleResult> {
+  return prisma.$transaction(async (tx) => {
+    const team = await lockTeam(tx, teamId);
+    if (!team) return fail(NO_TEAM);
+    const [size, ownRow, pendingExists] = await Promise.all([
+      tx.teamMember.count({ where: { teamId: team.id } }),
+      tx.teamMember.findUnique({
+        where: { hackathonId_userId: { hackathonId: team.hackathonId, userId } },
+        select: { teamId: true },
+      }),
+      pendingFor(tx, team.id, userId),
+    ]);
+    const rule = canRequest({
+      now: new Date(),
+      team: { size, max: team.hackathon.teamSizeMax, endsAt: team.hackathon.endsAt },
+      alreadyInTeam: ownRow !== null,
+      pendingExists,
+    });
+    if (!rule.ok) return rule;
+    if (!(await isOnboarded(tx, userId))) {
+      return fail("Finish setting up your profile before asking to join a team.");
+    }
+    await tx.teamInvite.create({
+      data: { teamId: team.id, hackathonId: team.hackathonId, userId, kind: "REQUEST", createdById: userId },
+    });
+    return { ok: true };
+  });
+}
+
+/**
+ * Accepts as `actorId`. The team row is locked before the lead is read, so a lead hand-over
+ * (leaveTeam takes the same lock) cannot change who may answer a REQUEST mid-accept.
+ * acceptInTransaction takes the lock again (a no-op in the same transaction) and rechecks the rules.
+ */
+export async function acceptInvite(actorId: string, inviteId: string): Promise<RuleResult> {
+  return prisma.$transaction(async (tx) => {
+    const invite = await tx.teamInvite.findUnique({
+      where: { id: inviteId },
+      select: { kind: true, userId: true, teamId: true },
+    });
+    if (!invite) return fail(NO_INVITE);
+    if (!(await lockTeam(tx, invite.teamId))) return fail(NO_TEAM);
+    const actorMayRespond = await mayRespond(tx, invite, actorId);
+    return acceptInTransaction(tx, inviteId, actorMayRespond);
+  });
+}
+
+export async function declineInvite(actorId: string, inviteId: string): Promise<RuleResult> {
+  const invite = await prisma.teamInvite.findUnique({
+    where: { id: inviteId },
+    select: { kind: true, userId: true, teamId: true },
+  });
+  if (!invite) return fail(NO_INVITE);
+  if (!(await mayRespond(prisma, invite, actorId))) return fail(CANT_RESPOND);
+  // Conditional update: if it was answered or cancelled meanwhile, nothing changes.
+  const { count } = await prisma.teamInvite.updateMany({
+    where: { id: inviteId, status: "PENDING" },
+    data: { status: "DECLINED", respondedAt: new Date() },
+  });
+  return count === 1 ? { ok: true } : fail(NOT_OPEN);
+}
+
+export async function cancelInvite(actorId: string, inviteId: string): Promise<RuleResult> {
+  const invite = await prisma.teamInvite.findUnique({ where: { id: inviteId }, select: { createdById: true } });
+  if (!invite) return fail(NO_INVITE);
+  if (invite.createdById !== actorId) return fail("Only the person who sent this can cancel it.");
+  const { count } = await prisma.teamInvite.updateMany({
+    where: { id: inviteId, createdById: actorId, status: "PENDING" },
+    data: { status: "CANCELLED", respondedAt: new Date() },
+  });
+  return count === 1 ? { ok: true } : fail(NOT_OPEN);
+}
+
+/** Slug of the hackathon a team belongs to, for revalidatePath. Null when the team is gone. */
+export async function hackathonSlugForTeam(teamId: string): Promise<string | null> {
+  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { hackathon: { select: { slug: true } } } });
+  return team?.hackathon.slug ?? null;
+}
+
+/** Slug of the hackathon an invite belongs to, for revalidatePath. Null when the invite is gone. */
+export async function hackathonSlugForInvite(inviteId: string): Promise<string | null> {
+  const invite = await prisma.teamInvite.findUnique({
+    where: { id: inviteId },
+    select: { hackathon: { select: { slug: true } } },
+  });
+  return invite?.hackathon.slug ?? null;
+}
+
+/** Things waiting on this user: INVITEs to them, plus REQUESTs to teams they lead. */
+export async function countPendingForUser(userId: string): Promise<number> {
+  return prisma.teamInvite.count({
+    where: {
+      status: "PENDING",
+      OR: [
+        { kind: "INVITE", userId },
+        { kind: "REQUEST", team: { members: { some: { userId, role: "LEAD" } } } },
+      ],
+    },
+  });
+}
+
+/** Teams this user leads in hackathons that have not ended, for the "Invite to…" team choice. */
+export async function myLeadTeams(userId: string): Promise<{ id: string; name: string; hackathonName: string }[]> {
+  const rows = await prisma.teamMember.findMany({
+    where: { userId, role: "LEAD", hackathon: { endsAt: { gt: new Date() } } },
+    orderBy: { joinedAt: "asc" },
+    select: { team: { select: { id: true, name: true } }, hackathon: { select: { name: true } } },
+  });
+  return rows.map((r) => ({ id: r.team.id, name: r.team.name, hackathonName: r.hackathon.name }));
+}
+
+export type InviteListRow = {
+  id: string;
+  kind: "INVITE" | "REQUEST";
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED";
+  teamName: string;
+  hackathonName: string;
+  hackathonSlug: string;
+  otherName: string; // a display name, never an email
+};
+
+const SENT_HISTORY = 20;
+const FALLBACK_NAME = "SkillGrid member";
+
+const INVITE_LIST_SELECT = {
+  id: true,
+  kind: true,
+  status: true,
+  createdById: true,
+  user: { select: { name: true } },
+  hackathon: { select: { name: true, slug: true } },
+  team: {
+    select: {
+      name: true,
+      members: { where: { role: "LEAD" }, select: { user: { select: { name: true } } } },
+    },
+  },
+} satisfies Prisma.TeamInviteSelect;
+
+type InviteListPayload = Prisma.TeamInviteGetPayload<{ select: typeof INVITE_LIST_SELECT }>;
+
+function toListRow(i: InviteListPayload, otherName: string | null | undefined): InviteListRow {
+  return {
+    id: i.id,
+    kind: i.kind,
+    status: i.status,
+    teamName: i.team.name,
+    hackathonName: i.hackathon.name,
+    hackathonSlug: i.hackathon.slug,
+    otherName: otherName || FALLBACK_NAME,
+  };
+}
+
+/**
+ * Everything the /invites page shows for this user:
+ * - `toMe`: pending INVITEs to the user (other person: whoever sent it)
+ * - `toMyTeams`: pending REQUESTs to teams the user leads (other person: the requester)
+ * - `sent`: invites and requests the user sent, pending first, then the latest answered ones
+ *   (other person: the invitee for an INVITE, the team's current lead for a REQUEST)
+ */
+export async function listInvitesForUser(
+  userId: string,
+): Promise<{ toMe: InviteListRow[]; toMyTeams: InviteListRow[]; sent: InviteListRow[] }> {
+  const [toMe, toMyTeams, sent] = await Promise.all([
+    prisma.teamInvite.findMany({
+      where: { status: "PENDING", kind: "INVITE", userId },
+      orderBy: { createdAt: "desc" },
+      select: INVITE_LIST_SELECT,
+    }),
+    prisma.teamInvite.findMany({
+      where: { status: "PENDING", kind: "REQUEST", team: { members: { some: { userId, role: "LEAD" } } } },
+      orderBy: { createdAt: "desc" },
+      select: INVITE_LIST_SELECT,
+    }),
+    prisma.teamInvite.findMany({
+      where: { createdById: userId },
+      // PENDING is first in the enum, so pending rows come first, each group newest first.
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      take: SENT_HISTORY,
+      select: INVITE_LIST_SELECT,
+    }),
+  ]);
+
+  // The sender of an INVITE may have left the team since, so look senders up by id.
+  const senderIds = [...new Set(toMe.map((i) => i.createdById))];
+  const senders = await prisma.user.findMany({ where: { id: { in: senderIds } }, select: { id: true, name: true } });
+  const senderName = new Map(senders.map((u) => [u.id, u.name]));
+
+  return {
+    toMe: toMe.map((i) => toListRow(i, senderName.get(i.createdById))),
+    toMyTeams: toMyTeams.map((i) => toListRow(i, i.user.name)),
+    sent: sent.map((i) => toListRow(i, i.kind === "INVITE" ? i.user.name : i.team.members[0]?.user.name)),
   };
 }
