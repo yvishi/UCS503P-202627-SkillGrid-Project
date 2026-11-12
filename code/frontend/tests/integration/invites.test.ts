@@ -7,7 +7,14 @@ import {
   respondToInviteAction,
 } from "@/app/(protected)/invites/actions";
 import { prisma } from "@/lib/prisma";
-import { countPendingForUser, createTeam, listInvitesForUser, myLeadTeams } from "@/lib/teams";
+import {
+  countPendingForUser,
+  createTeam,
+  joinStateForUser,
+  listInvitesForUser,
+  myLeadTeams,
+  pendingWithLeadTeams,
+} from "@/lib/teams";
 import { createUser, resetDb, signInAs } from "./helpers";
 
 beforeEach(async () => {
@@ -353,5 +360,53 @@ describe("countPendingForUser and myLeadTeams", () => {
 
     expect(await myLeadTeams(lead.id)).toEqual([{ id: teamId, name: "Open team", hackathonName: "Hack one" }]);
     expect(await myLeadTeams(member.id)).toEqual([]);
+  });
+});
+
+describe("pendingWithLeadTeams and joinStateForUser (discovery cards)", () => {
+  it("lists pending rows of either kind for the teams the user leads, and nothing answered", async () => {
+    const h = await makeHackathon();
+    const lead = await user();
+    const invited = await user();
+    const asker = await user();
+    const declined = await user();
+    const teamId = await teamOf(lead, h.id, "Mine");
+
+    await invite(lead, teamId, invited);
+    await request(asker, teamId);
+    const gone = await invite(lead, teamId, declined);
+    signInAs(declined);
+    expect(await respondToInviteAction(gone.id, false)).toEqual({ ok: true });
+
+    const rows = await pendingWithLeadTeams(lead.id);
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { teamId, userId: invited.id },
+        { teamId, userId: asker.id },
+      ]),
+    );
+    expect(await pendingWithLeadTeams(invited.id)).toEqual([]);
+  });
+
+  it("reports the viewer's hackathons with a team, requests sent and invites received", async () => {
+    const h = await makeHackathon();
+    const h2 = await makeHackathon({ slug: "hack-2" });
+    const viewer = await user();
+    const a = await user();
+    const b = await user();
+    await teamOf(viewer, h.id, "Own");
+    const askTeam = await teamOf(a, h2.id, "Asked");
+    const inviteTeam = await teamOf(b, h2.id, "Inviting");
+
+    await request(viewer, askTeam);
+    await invite(b, inviteTeam, viewer);
+
+    const state = await joinStateForUser(viewer.id);
+    expect(state).toEqual({
+      memberHackathonSlugs: ["hack-1"],
+      requestedTeamIds: [askTeam],
+      invitedTeamIds: [inviteTeam],
+    });
   });
 });
