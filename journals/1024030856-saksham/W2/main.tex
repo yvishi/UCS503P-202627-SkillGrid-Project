@@ -1,0 +1,118 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible,
+}
+
+\title{\bfseries Week 2: Profile Page, From Mock Data to the
+  Real Database}
+\author{Saksham Boran \\ \small Roll No: 1024030856}
+\date{8 September 2026}
+
+\begin{document}
+\maketitle
+
+\section{Context}
+Google Sign-In (college-domain-restricted, via Auth.js v5 with
+database sessions) and the onboarding flow landed early this week,
+which meant a signed-in, onboarded user with real \texttt{Profile}
+and \texttt{EvidenceRecord} rows in the database finally existed.
+That unblocked the task queued up from Week 1: a profile page for
+that user to view their own data.
+
+\section{Frontend: Profile Page, First Pass}
+Built \texttt{app/profile/page.tsx} against mock data first,
+deliberately shaped to mirror the two onboarding-path variants
+already defined in the schema (Path A: resume/GitHub evidence;
+Path B: self-reported comfort level, interests, availability), so
+the layout would be validated against the real data shapes before
+wiring up any queries. Also added a ``View profile'' link next to
+``Sign out'' on the signed-in home card, as the only entry point to
+the new page.
+
+\section{Backend: From Mock Data to a Real Query}
+Once the shape held up, relocated the page into the
+\texttt{(protected)} route group -- which gates on completed
+onboarding at the layout level, using the session from the Google
+sign-in flow built earlier in the week -- and replaced the mock
+fixtures with a real query:
+\begin{itemize}[leftmargin=0.7cm]
+  \item Profile fields read from \texttt{prisma.profile}.
+  \item Identity (name, email, avatar) read from the session
+    object rather than duplicated into \texttt{Profile}.
+  \item Resume/GitHub connection status derived from the user's
+    \texttt{EvidenceRecord} rows (presence/absence and
+    \texttt{source} field), rather than a separate boolean flag
+    that could drift out of sync with the actual evidence.
+\end{itemize}
+The route group's layout already redirects a not-yet-onboarded
+user away, so the page itself only needed a direct-navigation guard
+for someone hitting the URL manually mid-onboarding -- the common
+path was already covered upstream.
+
+\section{Debugging: Broken Avatars With No Fallback}
+\textbf{Error encountered:} the profile header rendered a plain
+\texttt{<img>} whenever \texttt{Profile.image} was non-null. This
+showed a broken-image icon instead of a sensible fallback, because
+Google's avatar URLs (\texttt{lh3.googleusercontent.com}) both
+rate-limit by IP and expire.
+
+\textbf{Key observation:} the existing initials-fallback logic
+only covered the \emph{null} case (no image URL at all) --  a URL
+that resolves at render time but fails to \emph{load} in the
+browser is a different failure mode that needs handling on the
+client, not the server.
+
+\textbf{Solution:} extracted a client component
+(\texttt{Avatar.tsx}) that swaps to initials on the image's
+\texttt{onError} event, plus a mount-time check for failures that
+happen before hydration attaches that handler (the image is
+server-rendered, so the browser can fail to load it before any
+client JS has run):
+\begin{lstlisting}[language=JavaScript]
+function Avatar({ src, initials }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    // catches a failure that happened before hydration
+    if (imgRef.current && !imgRef.current.complete) setFailed(true);
+  }, []);
+  if (failed || !src) return <InitialsFallback text={initials} />;
+  return <img ref={imgRef} src={src} onError={() => setFailed(true)} />;
+}
+\end{lstlisting}
+
+\section{Verification}
+No automated test framework exists yet, so verification was
+manual: a live walkthrough against the real Neon database and a
+real Google account confirmed the profile page correctly renders
+both onboarding-path variants, resume/GitHub status reflects the
+actual \texttt{EvidenceRecord} rows (not a stale flag), and a
+simulated broken avatar URL falls back to initials instead of a
+broken-image icon.
+
+\section{Outcome}
+Shipped the profile page as three small, separately reviewed
+commits: mock-data version, database-backed version, then the
+avatar fix -- each landing cleanly rather than as one large
+first-pass diff.
+
+\section{Follow-ups}
+\begin{itemize}[leftmargin=0.7cm]
+  \item At this point the only evidence source was an unverified
+    GitHub URL a user typed in during onboarding -- the profile
+    page displayed it as-is. Turning that into a real, verified
+    GitHub connection was the natural next task, picked up in
+    Week 3.
+  \item No automated tests cover the profile page yet; correctness
+    still relies on manual walkthroughs.
+\end{itemize}
+
+\end{document}

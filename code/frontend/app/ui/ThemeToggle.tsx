@@ -41,7 +41,7 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label="Toggle color theme"
-      className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-ink-muted transition hover:border-border-strong hover:text-ink"
+      className="flex h-9 w-9 items-center justify-center rounded-theme-md border border-border bg-surface text-ink-muted transition hover:border-border-strong hover:text-ink"
       suppressHydrationWarning
     >
       {theme === "dark" ? (

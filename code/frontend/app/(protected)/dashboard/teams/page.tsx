@@ -1,40 +1,82 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { TEAM_FIXTURES } from "@/lib/dashboard-fixtures";
-import { Eyebrow } from "@/app/ui/primitives";
+import { auth } from "@/auth";
+import { Reveal } from "@/app/ui/motion";
+import { Empty } from "@/app/ui/primitives";
+import { findOpenTeams } from "@/lib/discovery";
+import { joinState, parseTeamFilters } from "@/lib/discovery-core";
+import { prisma } from "@/lib/prisma";
+import { joinStateForUser } from "@/lib/teams";
 import { TeamCard } from "../MatchCards";
+import { PageHeader } from "../PageHeader";
+import { RequestJoinButton } from "../RequestJoinButton";
+import { Filters } from "./Filters";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Find a Team",
 };
 
-export default function TeamsPage() {
-  return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-10">
-      <div>
-        <Link
-          href="/dashboard"
-          className="font-display text-sm font-medium text-ink-muted transition hover:text-trust"
-        >
-          ← Dashboard
-        </Link>
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div>
-            <Eyebrow>Groups</Eyebrow>
-            <h1 className="font-display mt-1 text-2xl font-semibold tracking-tight">
-              Find a team
-            </h1>
-          </div>
-          <span className="text-xs text-ink-muted">Sample listing</span>
-        </div>
-      </div>
+export default async function TeamsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // The (protected) layout already guarantees a signed-in, onboarded user.
+  const session = (await auth())!;
+  const viewerId = session.user!.id!;
+  const filters = parseTeamFilters(await searchParams);
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {TEAM_FIXTURES.map((team) => (
-          <TeamCard key={team.id} team={team} />
-        ))}
-      </div>
+  const [{ items, hasMore }, hackathons, viewerState] = await Promise.all([
+    findOpenTeams(viewerId, filters),
+    prisma.hackathon.findMany({
+      where: { endsAt: { gt: new Date() } },
+      orderBy: { startsAt: "asc" },
+      select: { slug: true, name: true },
+    }),
+    joinStateForUser(viewerId),
+  ]);
+
+  const next = new URLSearchParams();
+  if (filters.hackathon) next.set("hackathon", filters.hackathon);
+  if (filters.skill) next.set("skill", filters.skill);
+  next.set("page", String(filters.page + 1));
+
+  return (
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
+      <PageHeader
+        eyebrow="Groups"
+        title="Find a team"
+        description="Teams with an open slot for a hackathon that has not ended, and the skills they still need."
+      />
+
+      <Filters filters={filters} hackathons={hackathons} />
+
+      {items.length === 0 ? (
+        <Empty message="No open teams match these filters yet." />
+      ) : (
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((team, i) => (
+            <li key={team.id}>
+              <Reveal delay={Math.min(i, 8) * 0.06} className="h-full">
+                <TeamCard
+                  team={team}
+                  action={<RequestJoinButton teamId={team.id} state={joinState(team, viewerState)} />}
+                />
+              </Reveal>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {hasMore && (
+        <Link
+          href={`/dashboard/teams?${next.toString()}`}
+          className="w-fit font-mono text-sm text-ink-muted transition-colors hover:text-trust"
+        >
+          Next page →
+        </Link>
+      )}
     </main>
   );
 }

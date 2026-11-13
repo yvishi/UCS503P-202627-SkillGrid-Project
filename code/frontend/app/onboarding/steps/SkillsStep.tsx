@@ -1,65 +1,39 @@
 "use client";
 
-import { SKILLS, SKILL_RATING_LEVELS, SKILL_RATING_LABELS, type SkillRatings } from "@/lib/skills";
+import { SkillPicker } from "@/app/ui/skill-picker/SkillPicker";
+import type { SkillEditorState } from "@/app/ui/skill-picker/use-skill-editor";
+import type { EvidenceSnapshot } from "@/lib/skill-suggestions";
+
 import { StepShell } from "./StepShell";
 
-// Spec sections 4.2 / 5.1: same fixed skill list and comfort selector for
-// both paths -- Path A shows this after the resume step, Path B shows it
-// as the first onboarding screen. Resume-extracted tags are reconciled
-// separately at Review (not shown here).
+// Spec section 5.2: the same picker as /profile/skills, saving as the user
+// goes. `value` seeds the picker when the step mounts and drives Continue;
+// the picker reports every change back through onChange.
 export function SkillsStep({
   value,
+  evidence,
   onChange,
   onContinue,
   onBack,
 }: {
-  value: SkillRatings;
-  onChange: (next: SkillRatings) => void;
+  value: SkillEditorState;
+  evidence: EvidenceSnapshot | null;
+  onChange: (next: SkillEditorState) => void;
   onContinue: () => void;
   onBack?: () => void;
 }) {
-  function setRating(slug: (typeof SKILLS)[number]["slug"], level: (typeof SKILL_RATING_LEVELS)[number]) {
-    const next = { ...value };
-    next[slug] = next[slug] === level ? undefined : level;
-    onChange(next);
-  }
-
-  const ratedCount = Object.values(value).filter(Boolean).length;
+  const count = value.skills.length + value.reports.filter((r) => r.status === "PENDING").length;
 
   return (
     <StepShell
-      title="Rate your skills"
-      description="Pick a comfort level for anything you know. Skip what doesn't apply."
+      title="Add your skills"
+      description="Search for anything you know and rate how comfortable you are. Skills found on your resume or GitHub show up as suggestions."
       onContinue={onContinue}
       onBack={onBack}
-      continueDisabled={ratedCount === 0}
+      continueDisabled={count === 0}
+      disabledHint="Add at least one skill to continue."
     >
-      <div className="flex flex-col divide-y divide-border overflow-hidden rounded-2xl border border-border">
-        {SKILLS.map((skill) => (
-          <div key={skill.slug} className="flex flex-wrap items-center justify-between gap-3 bg-surface p-3.5">
-            <span className="font-display text-sm font-medium">{skill.label}</span>
-            <div className="flex gap-1.5">
-              {SKILL_RATING_LEVELS.map((level) => {
-                const active = value[skill.slug] === level;
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setRating(skill.slug, level)}
-                    className={`font-display rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                      active
-                        ? "border-trust bg-trust text-surface"
-                        : "border-border-strong text-ink-muted hover:border-trust hover:text-trust"
-                    }`}
-                  >
-                    {SKILL_RATING_LABELS[level]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
+      <SkillPicker initial={value} evidence={evidence} onChange={onChange} />
     </StepShell>
   );
 }

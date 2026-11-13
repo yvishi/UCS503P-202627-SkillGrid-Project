@@ -3,19 +3,15 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { uploadResume } from "@/lib/blob";
 import { prisma } from "@/lib/prisma";
 import {
   AVAILABILITY_OPTIONS,
   isInterestTag,
   type AvailabilityOption,
 } from "@/lib/onboarding-options";
-import {
-  checkResumeIntegrity,
-  extractPdfText,
-  extractSkillsFromResumeText,
-} from "@/lib/resume-parser";
-import { isSkillRatingLevel, isSkillSlug, type SkillRatings, type SkillSlug } from "@/lib/skills";
+import { processResumeUpload } from "@/lib/resume-upload";
+import { recomputeUserScoresSafely } from "@/lib/skill-score";
+import { countSkillsAndPendingReports } from "@/lib/user-skills";
 
 async function requireUserId(): Promise<string> {
   const session = await auth();
@@ -26,8 +22,6 @@ async function requireUserId(): Promise<string> {
   return userId;
 }
 
-const MAX_RESUME_BYTES = 5 * 1024 * 1024;
-
 // ---------------------------------------------------------------------------
 // Resume upload step (Path A, spec section 4.1): fast integrity check is
 // synchronous and blocking. If it passes, this also runs the keyword-based
@@ -35,11 +29,17 @@ const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 // this phase, so the two are sequenced in one request rather than one
 // blocking and one async, but they remain separate functions/concerns
 // (lib/resume-parser.ts) so a real queue can be dropped in later.
+//
+// Text extraction tries pdf-parse's text layer first and falls back to
+// OCR.space only for scanned/image-only PDFs (see extractResumeText) --
+// most uploads never touch the OCR API at all. The upload/validate/parse
+// pipeline itself is shared with the post-onboarding re-upload flow (see
+// app/(protected)/profile/resume) via lib/resume-upload.ts.
 // ---------------------------------------------------------------------------
 export type ResumeCheckState =
   | { status: "idle" }
   | { status: "error"; reason: string }
-  | { status: "ok"; fileUrl: string; extractedSkills: SkillSlug[] };
+  | { status: "ok"; fileUrl: string; evidenceId: string; extractedSkills: string[]; usedOcr: boolean };
 
 export async function checkResumeAction(
   _prevState: ResumeCheckState,
@@ -48,54 +48,46 @@ export async function checkResumeAction(
   const userId = await requireUserId();
   const file = formData.get("resume");
 
-  if (!(file instanceof File) || file.size === 0) {
+  if (!(file instanceof File)) {
     return { status: "error", reason: "Please upload a resume to continue." };
   }
-  if (file.size > MAX_RESUME_BYTES) {
-    return { status: "error", reason: "Resume must be 5MB or smaller." };
-  }
-  if (file.type !== "application/pdf") {
-    return { status: "error", reason: "Resume must be a PDF file." };
+
+  const result = await processResumeUpload(userId, file);
+  if (!result.ok) {
+    return { status: "error", reason: result.reason };
   }
 
-  let text: string;
+  let evidenceId: string;
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    text = await extractPdfText(buffer);
-  } catch (err) {
-    console.error("extractPdfText failed:", err);
-    return {
-      status: "error",
-      reason: "Couldn't read that PDF. Try a different file, or continue manually instead.",
-    };
-  }
-
-  const integrity = checkResumeIntegrity(text);
-  if (!integrity.passed) {
-    return { status: "error", reason: integrity.reason! };
-  }
-
-  const extractedSkills = extractSkillsFromResumeText(text);
-
-  let fileUrl: string;
-  try {
-    fileUrl = await uploadResume(userId, file);
-    await prisma.evidenceRecord.create({
+    const record = await prisma.evidenceRecord.create({
       data: {
         userId,
         source: "RESUME",
-        payload: { fileUrl, status: "parsed", extractedSkills },
+        payload: {
+          fileUrl: result.fileUrl,
+          filename: result.filename,
+          status: "parsed",
+          extractedSkills: result.extractedSkills,
+          usedOcr: result.usedOcr,
+        },
       },
     });
+    evidenceId = record.id;
   } catch (err) {
-    console.error("checkResumeAction upload/save failed:", err);
+    console.error("checkResumeAction save failed:", err);
     return {
       status: "error",
       reason: "Something went wrong uploading your resume. Please try again.",
     };
   }
 
-  return { status: "ok", fileUrl, extractedSkills };
+  return {
+    status: "ok",
+    fileUrl: result.fileUrl,
+    evidenceId,
+    extractedSkills: result.extractedSkills,
+    usedOcr: result.usedOcr,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -104,11 +96,11 @@ export async function checkResumeAction(
 // than threading each step through its own FormData round-trip.
 // ---------------------------------------------------------------------------
 export type SubmitPayload = {
-  skillRatings: SkillRatings;
   interestTags: string[];
   availability: AvailabilityOption | null;
   projectLinks: string[];
-  githubUrl: string;
+  resumeEvidenceId: string | null;
+  githubEvidenceId: string | null;
 };
 
 export type SubmitState = { error: string } | null;
@@ -120,15 +112,11 @@ function isAvailability(value: unknown): value is AvailabilityOption {
 export async function submitOnboardingAction(payload: SubmitPayload): Promise<SubmitState> {
   const userId = await requireUserId();
 
-  const skillRatings: SkillRatings = {};
-  for (const [slug, level] of Object.entries(payload.skillRatings)) {
-    if (!isSkillSlug(slug) || !level || !isSkillRatingLevel(level)) {
-      return { error: "Received an invalid skill rating." };
-    }
-    skillRatings[slug] = level;
-  }
-  if (Object.keys(skillRatings).length === 0) {
-    return { error: "Please rate at least one skill." };
+  // Skills are saved as they're picked (app/skills/actions.ts), so just
+  // confirm the user has at least one -- or one waiting for review.
+  const { skills, pendingReports } = await countSkillsAndPendingReports(userId);
+  if (skills + pendingReports === 0) {
+    return { error: "Please add at least one skill." };
   }
 
   if (!isAvailability(payload.availability)) {
@@ -157,52 +145,49 @@ export async function submitOnboardingAction(payload: SubmitPayload): Promise<Su
     }
   }
 
-  const githubUrl = payload.githubUrl.trim();
-  if (githubUrl) {
-    try {
-      new URL(githubUrl);
-    } catch {
-      return { error: `"${githubUrl}" is not a valid GitHub URL.` };
+  // resumeEvidenceId/githubEvidenceId come from client state -- verify
+  // they're actually this user's own records before trusting them, the
+  // same check selectResumeAction makes
+  // (app/(protected)/profile/resume/actions.ts). Detected skills are
+  // evidence only; nothing is folded into self-ratings here.
+  if (payload.resumeEvidenceId) {
+    const record = await prisma.evidenceRecord.findUnique({ where: { id: payload.resumeEvidenceId } });
+    if (!record || record.userId !== userId || record.source !== "RESUME") {
+      return { error: "Invalid resume selection." };
+    }
+  }
+
+  if (payload.githubEvidenceId) {
+    const record = await prisma.evidenceRecord.findUnique({ where: { id: payload.githubEvidenceId } });
+    if (!record || record.userId !== userId || record.source !== "GITHUB") {
+      return { error: "Invalid GitHub connection." };
     }
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.profile.upsert({
-        where: { userId },
-        create: {
-          userId,
-          skillRatings,
-          availability: payload.availability!,
-          interestTags,
-          projectLinks,
-          onboardingCompletedAt: new Date(),
-        },
-        update: {
-          skillRatings,
-          availability: payload.availability!,
-          interestTags,
-          projectLinks,
-          onboardingCompletedAt: new Date(),
-        },
-      });
-
-      // Placeholder evidence source (spec section 8): an unverified URL
-      // field, not real OAuth, since no GitHub app credentials exist here.
-      if (githubUrl) {
-        await tx.evidenceRecord.create({
-          data: {
-            userId,
-            source: "GITHUB",
-            payload: { url: githubUrl, verified: false },
-          },
-        });
-      }
+    await prisma.profile.upsert({
+      where: { userId },
+      create: {
+        userId,
+        availability: payload.availability!,
+        interestTags,
+        projectLinks,
+        activeResumeId: payload.resumeEvidenceId,
+        onboardingCompletedAt: new Date(),
+      },
+      update: {
+        availability: payload.availability!,
+        interestTags,
+        projectLinks,
+        activeResumeId: payload.resumeEvidenceId,
+        onboardingCompletedAt: new Date(),
+      },
     });
   } catch (err) {
     console.error("submitOnboardingAction failed:", err);
     return { error: "Something went wrong saving your profile. Please try again." };
   }
+  await recomputeUserScoresSafely(userId);
 
   redirect("/dashboard");
 }

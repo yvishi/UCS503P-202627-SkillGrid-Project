@@ -1,21 +1,30 @@
 "use client";
 
 import { AVAILABILITY_LABELS, type AvailabilityOption } from "@/lib/onboarding-options";
-import { SKILLS, SKILL_RATING_LABELS, skillLabel, type SkillRatings, type SkillSlug } from "@/lib/skills";
-import { PrimaryButton, Pill } from "@/app/ui/primitives";
+import { buildSkillGrid } from "@/lib/skill-grid";
+import type { OpenReport } from "@/lib/skill-report-input";
+import type { EvidenceSnapshot } from "@/lib/skill-suggestions";
+import { SKILL_RATING_LABELS, type UserSkillEntry } from "@/lib/skills";
+import { Empty, Eyebrow, Pill, PrimaryButton, TrustBadge } from "@/app/ui/primitives";
+import { EvidenceGrid, GridLegend } from "@/app/ui/EvidenceGrid";
 import type { StepKey } from "../Stepper";
 
-// Spec sections 4.7 / 5.6: an editable summary of everything collected so
-// far, plus (Path A only) the resume-extracted skill tags reconciled here.
+import { ArrowRight, StepCard, StepFooter, StepHeading } from "./StepShell";
+
+// Spec section 5.2: a summary of everything collected so far. Skills are
+// already saved (the picker writes as you go), so this only previews them
+// on the grid beside what the resume and GitHub found. Detected skills are
+// evidence, not ratings -- nothing is reconciled into ratings here.
 export function ReviewStep({
   hasResume,
-  resumeSkills,
-  onResumeSkillsChange,
-  skillRatings,
+  resumeUsedOcr,
+  skills,
+  reports,
+  evidence,
   interestTags,
   availability,
   projectLinks,
-  githubUrl,
+  githubUsername,
   onEditStep,
   onBack,
   onSubmit,
@@ -23,163 +32,182 @@ export function ReviewStep({
   error,
 }: {
   hasResume: boolean;
-  resumeSkills: SkillSlug[];
-  onResumeSkillsChange: (next: SkillSlug[]) => void;
-  skillRatings: SkillRatings;
+  resumeUsedOcr: boolean;
+  skills: UserSkillEntry[];
+  reports: OpenReport[];
+  evidence: EvidenceSnapshot | null;
   interestTags: string[];
   availability: AvailabilityOption | null;
   projectLinks: string[];
-  githubUrl: string;
+  githubUsername: string | null;
   onEditStep: (step: StepKey) => void;
   onBack: () => void;
   onSubmit: () => void;
   isSubmitting: boolean;
   error: string | null;
 }) {
-  const addableSkills = SKILLS.filter((s) => !resumeSkills.includes(s.slug));
+  const names = new Map(Object.entries(evidence?.names ?? {}));
+  const grid = buildSkillGrid({
+    userSkills: skills,
+    resumeSkills: evidence?.resume ?? [],
+    githubSkills: evidence?.github ?? [],
+    skillNames: names,
+  });
+  const pendingReports = reports.filter((r) => r.status === "PENDING");
+  const resumeSkillNames = (evidence?.resume ?? []).flatMap((slug) => names.get(slug) ?? []);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold tracking-tight">Review & submit</h1>
-        <p className="mt-1 text-sm text-ink-muted">Check everything below, then submit your profile.</p>
-      </div>
+    <StepCard>
+      <StepHeading title="Review and submit" description="Check everything below, then submit your profile." />
 
-      {hasResume && (
-        <ReviewRow label="Resume-extracted skills" onEdit={undefined}>
-          <div className="flex flex-wrap gap-2">
-            {resumeSkills.map((slug) => (
-              <span key={slug} className="font-display inline-flex items-center gap-1.5 rounded-full border border-border-strong bg-surface-alt px-3 py-1 text-xs font-medium">
-                {skillLabel(slug)}
-                <button
-                  type="button"
-                  onClick={() => onResumeSkillsChange(resumeSkills.filter((s) => s !== slug))}
-                  aria-label={`Remove ${skillLabel(slug)}`}
-                  className="text-ink-muted hover:text-danger"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            {resumeSkills.length === 0 && <span className="text-sm text-ink-muted">None found — add manually below.</span>}
-          </div>
-          {addableSkills.length > 0 && (
-            <select
-              defaultValue=""
-              onChange={(e) => {
-                if (e.target.value) onResumeSkillsChange([...resumeSkills, e.target.value as SkillSlug]);
-                e.target.value = "";
-              }}
-              className="font-display mt-2 rounded-full border border-border-strong bg-surface px-3 py-1.5 text-xs"
-            >
-              <option value="" disabled>
-                + Add a skill
-              </option>
-              {addableSkills.map((s) => (
-                <option key={s.slug} value={s.slug}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+      <div className="flex flex-col gap-4 px-5 pb-6 sm:px-7">
+        <ReviewRow label="Your grid so far" onEdit={() => onEditStep("skills")} editLabel="Edit skills">
+          {grid.rows.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              <EvidenceGrid
+                columns={grid.columns}
+                rows={grid.rows}
+                selfColumn={grid.selfColumn}
+                size="md"
+                caption="Preview of your skill grid: your rating next to resume and GitHub evidence for each skill"
+              />
+              <GridLegend />
+              {skills.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {skills.map((s) => (
+                    <Pill key={s.slug} tone="warm">
+                      {s.name} · {SKILL_RATING_LABELS[s.level]}
+                    </Pill>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <Empty message="No skills yet. Add a few so your grid has something on it." />
+          )}
+          {pendingReports.length > 0 && (
+            <p className="mt-3 text-xs text-ink-muted">
+              Waiting for review: {pendingReports.map((r) => r.rawName).join(", ")}. They join your grid once approved.
+            </p>
           )}
         </ReviewRow>
-      )}
 
-      <ReviewRow label="Skill ratings" onEdit={() => onEditStep("skills")}>
-        {Object.keys(skillRatings).length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {(Object.entries(skillRatings) as [SkillSlug, keyof typeof SKILL_RATING_LABELS][]).map(
-              ([slug, level]) =>
-                level && (
-                  <Pill key={slug}>
-                    {skillLabel(slug)} · {SKILL_RATING_LABELS[level]}
+        {hasResume && (
+          <ReviewRow
+            label={resumeUsedOcr ? "From your resume (scanned with OCR)" : "From your resume"}
+            aside={<TrustBadge>Evidence</TrustBadge>}
+          >
+            {evidence === null ? (
+              <Empty message="Loading…" />
+            ) : resumeSkillNames.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {resumeSkillNames.map((name) => (
+                  <Pill key={name} tone="trust">
+                    {name}
                   </Pill>
-                ),
+                ))}
+              </div>
+            ) : (
+              <Empty message="No skills found on your resume. Add them yourself in the skills step." />
             )}
-          </div>
-        ) : (
-          <span className="text-sm text-ink-muted">None rated</span>
+          </ReviewRow>
         )}
-      </ReviewRow>
 
-      <ReviewRow label="Interests" onEdit={() => onEditStep("interests")}>
-        {interestTags.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {interestTags.map((tag) => (
-              <Pill key={tag}>{tag}</Pill>
-            ))}
-          </div>
-        ) : (
-          <span className="text-sm text-ink-muted">None selected</span>
+        <ReviewRow label="Interests" onEdit={() => onEditStep("interests")}>
+          {interestTags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {interestTags.map((tag) => (
+                <Pill key={tag}>{tag}</Pill>
+              ))}
+            </div>
+          ) : (
+            <Empty message="None selected" />
+          )}
+        </ReviewRow>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <ReviewRow label="Availability" onEdit={() => onEditStep("availability")}>
+            {availability ? (
+              <span className="text-sm font-medium">{AVAILABILITY_LABELS[availability]}</span>
+            ) : (
+              <Empty message="Not set" />
+            )}
+          </ReviewRow>
+
+          <ReviewRow label="GitHub" onEdit={() => onEditStep("github")}>
+            {githubUsername ? (
+              <TrustBadge>Connected as @{githubUsername}</TrustBadge>
+            ) : (
+              <Empty message="Not connected" />
+            )}
+          </ReviewRow>
+        </div>
+
+        <ReviewRow label="Projects" onEdit={() => onEditStep("projects")}>
+          {projectLinks.filter(Boolean).length > 0 ? (
+            <ul className="flex flex-col gap-1.5 text-sm">
+              {projectLinks.filter(Boolean).map((link) => (
+                <li key={link} className="flex min-w-0 items-center gap-2">
+                  <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-[2px] bg-ink-muted" />
+                  <span className="truncate font-mono text-xs">{link}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Empty message="None added" />
+          )}
+        </ReviewRow>
+
+        {error && (
+          <p role="alert" className="rounded-theme-md border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">
+            {error}
+          </p>
         )}
-      </ReviewRow>
-
-      <ReviewRow label="Availability" onEdit={() => onEditStep("availability")}>
-        <span className="text-sm">{availability ? AVAILABILITY_LABELS[availability] : "Not set"}</span>
-      </ReviewRow>
-
-      <ReviewRow label="Projects" onEdit={() => onEditStep("projects")}>
-        {projectLinks.filter(Boolean).length > 0 ? (
-          <ul className="flex flex-col gap-1 text-sm">
-            {projectLinks.filter(Boolean).map((link) => (
-              <li key={link} className="truncate">{link}</li>
-            ))}
-          </ul>
-        ) : (
-          <span className="text-sm text-ink-muted">None added</span>
-        )}
-      </ReviewRow>
-
-      <ReviewRow label="GitHub" onEdit={() => onEditStep("github")}>
-        <span className="text-sm">{githubUrl || "Not connected"}</span>
-      </ReviewRow>
-
-      {error && (
-        <p className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</p>
-      )}
-
-      <div className="flex items-center justify-between gap-3 border-t border-border pt-5">
-        <button
-          type="button"
-          onClick={onBack}
-          className="font-display text-sm font-medium text-ink-muted transition hover:text-trust"
-        >
-          ← Back
-        </button>
-        <PrimaryButton type="button" onClick={onSubmit} disabled={isSubmitting}>
-          {isSubmitting ? "Submitting…" : "Submit"}
-        </PrimaryButton>
       </div>
-    </div>
+
+      <StepFooter
+        onBack={onBack}
+        actions={
+          <PrimaryButton type="button" onClick={onSubmit} disabled={isSubmitting}>
+            {isSubmitting ? "Submitting…" : "Submit profile"}
+            {!isSubmitting && <ArrowRight />}
+          </PrimaryButton>
+        }
+      />
+    </StepCard>
   );
 }
 
 function ReviewRow({
   label,
   onEdit,
+  editLabel = "Edit",
+  aside,
   children,
 }: {
   label: string;
   onEdit?: () => void;
+  editLabel?: string;
+  aside?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-display text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-muted">
-          {label}
-        </span>
+    <section className="rounded-theme-md border border-border bg-surface p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <Eyebrow>{label}</Eyebrow>
+        {aside}
         {onEdit && (
           <button
             type="button"
             onClick={onEdit}
-            className="font-display text-xs font-semibold text-trust underline decoration-trust/40 underline-offset-2 hover:decoration-trust"
+            aria-label={`${editLabel}: ${label}`}
+            className="rounded-theme-sm text-xs font-semibold text-ink-muted underline decoration-border-strong underline-offset-4 transition hover:text-ink hover:decoration-ink"
           >
-            Edit
+            {editLabel}
           </button>
         )}
       </div>
       {children}
-    </div>
+    </section>
   );
 }

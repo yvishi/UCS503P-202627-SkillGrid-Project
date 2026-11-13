@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Deploying the open skill catalog
+
+The skill catalog moves self-ratings out of `Profile.skillRatings` into `skills` / `user_skills` tables. Do these in order against the production database (the `.env` database used for development has already been migrated and seeded):
+
+1. Pre-check: `SELECT count(*) FROM profiles WHERE jsonb_typeof("skillRatings") <> 'object';` must return 0.
+2. `npx prisma migrate deploy`
+3. `npx prisma db seed` (safe to re-run; keeps admin-added aliases)
+4. `npx tsx prisma/scripts/verify-skill-migration.ts` must print `OK`.
+5. Set `ADMIN_EMAILS` (comma-separated) in the Vercel environment.
+6. Only then merge/deploy the app code. The old code keeps working on the migrated schema; the new code needs the tables and the seeded catalog.
+7. Follow-up once verified in production: drop `Profile.skillRatings` with a new migration and delete `prisma/scripts/verify-skill-migration.ts`.

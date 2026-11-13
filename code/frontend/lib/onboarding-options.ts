@@ -2,7 +2,7 @@
 // (see prisma/schema.prisma) -- there is no separate mapping layer
 // between form values and DB enum values.
 //
-// Per-skill comfort ratings (lib/skills.ts SkillRatings) replaced the old
+// Per-skill comfort ratings (UserSkill rows; lib/user-skills.ts) replaced the old
 // single profile-wide comfort level as of onboarding v2; the Prisma
 // `comfortLevel` column is kept for backward compatibility but is no
 // longer read or written anywhere in the app.

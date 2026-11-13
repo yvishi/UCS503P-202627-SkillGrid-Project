@@ -24,6 +24,17 @@ model User {
 
   profile         Profile?
   evidenceRecords EvidenceRecord[]
+  skills          UserSkill[]
+  skillRequests   SkillRequest[]
+
+  skillScores       SkillScore[]
+  teamMemberships   TeamMember[]
+  teamInvites       TeamInvite[]
+  participations    Participation[]
+  feedbackGiven     PeerFeedback[]  @relation("FeedbackGiven")
+  feedbackReceived  PeerFeedback[]  @relation("FeedbackReceived")
+  hackathonsCreated Hackathon[]     @relation("HackathonCreatedBy")
+  teamsCreated      Team[]          @relation("TeamCreatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -87,10 +98,20 @@ model Profile {
   availability          Availability?
   projectLinks          String[]      @default([])
 
-  // Per-skill self-assessment from onboarding v2 (skill slug -> ComfortLevel),
-  // e.g. {"react": "INTERMEDIATE", "docker": "BEGINNER"}. Additive to the
-  // single `comfortLevel` field above, which older screens still read.
+  // DEPRECATED -- copied into user_skills by the open_skill_catalog
+  // migration and no longer read or written. Drop it once
+  // prisma/scripts/verify-skill-migration.ts has passed on production.
   skillRatings Json @default("{}")
+
+  // Which RESUME EvidenceRecord.id is "current" (see app/(protected)/profile/resume) --
+  // a user can upload multiple resumes over time and switch back to an
+  // older one without re-uploading it. No formal relation constraint since
+  // EvidenceRecord rows aren't otherwise addressed individually by id.
+  activeResumeId String?
+
+  // Evidence-weighted score summary, recomputed with skill_scores (lib/skill-score-core.ts).
+  evidenceScore  Int       @default(0)
+  scoreUpdatedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -134,4 +155,251 @@ model EvidenceRecord {
 
   @@index([userId, source])
   @@map("evidence_records")
+}
+
+// ---------------------------------------------------------------------------
+// Open skill catalog (docs/superpowers/specs/2026-10-15-open-skill-catalog-design.md)
+// ---------------------------------------------------------------------------
+
+// One row per skill anyone can hold. `keys` holds skillKey() of the slug,
+// name and every alias (lib/skill-normalize.ts) so "ReactJS" and "react.js"
+// both find React with one indexed lookup.
+model Skill {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  name        String
+  aliases     String[]      @default([])
+  keys        String[]      @default([])
+  category    SkillCategory @default(OTHER)
+  origin      SkillOrigin   @default(CURATED)
+  // Resume matching is case-sensitive for names that are ordinary words.
+  strictMatch Boolean       @default(false)
+
+  users        UserSkill[]
+  scores       SkillScore[]
+  peerFeedback PeerFeedback[]
+
+  createdAt DateTime @default(now())
+
+  @@index([keys], type: Gin)
+  @@map("skills")
+}
+
+// A user's self-rated skill. Replaces the old Profile.skillRatings JSON.
+model UserSkill {
+  userId  String
+  skillId String
+  level   ComfortLevel
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, skillId])
+  @@index([skillId])
+  @@map("user_skills")
+}
+
+// A skill a user couldn't find in the catalog. Nothing enters the catalog
+// until an admin approves or merges it (app/admin/skill-requests).
+model SkillRequest {
+  id              String             @id @default(cuid())
+  userId          String
+  rawName         String
+  key             String
+  requestedLevel  ComfortLevel
+  note            String?
+  status          SkillRequestStatus @default(PENDING)
+  resolvedSkillId String?
+  reviewedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([status, key])
+  @@map("skill_requests")
+}
+
+enum SkillCategory {
+  LANGUAGE
+  FRAMEWORK
+  LIBRARY
+  TOOL
+  PLATFORM
+  DATABASE
+  DESIGN
+  CONCEPT
+  OTHER
+}
+
+enum SkillOrigin {
+  CURATED
+  GITHUB
+  REQUESTED
+}
+
+enum SkillRequestStatus {
+  PENDING
+  APPROVED
+  MERGED
+  REJECTED
+}
+
+// ---------------------------------------------------------------------------
+// Scores, hackathons, teams, invites, participation and peer feedback
+// ---------------------------------------------------------------------------
+
+// Stored per-skill evidence score, recomputed whenever evidence or
+// self-ratings change so discovery is a plain indexed query.
+model SkillScore {
+  userId  String
+  skillId String
+  score   Int // 0-100, lib/skill-score-core.ts
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, skillId])
+  @@index([skillId, score])
+  @@map("skill_scores")
+}
+
+model Hackathon {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  startsAt    DateTime
+  endsAt      DateTime
+  teamSizeMin Int      @default(2)
+  teamSizeMax Int      @default(4)
+  createdById String
+
+  createdBy      User            @relation("HackathonCreatedBy", fields: [createdById], references: [id])
+  teams          Team[]
+  members        TeamMember[]
+  invites        TeamInvite[]
+  participations Participation[]
+  feedback       PeerFeedback[]
+
+  createdAt DateTime @default(now())
+
+  @@map("hackathons")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  hackathonId String
+  name        String
+  description String?
+  lookingFor  String[] @default([]) // skill slugs
+  createdById String
+
+  hackathon Hackathon      @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  createdBy User           @relation("TeamCreatedBy", fields: [createdById], references: [id])
+  members   TeamMember[]
+  invites   TeamInvite[]
+  feedback  PeerFeedback[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([hackathonId, name])
+  @@map("teams")
+}
+
+model TeamMember {
+  teamId      String
+  userId      String
+  hackathonId String // denormalised so one-team-per-hackathon is a DB constraint
+  role        TeamRole @default(MEMBER)
+
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
+
+  @@id([teamId, userId])
+  @@unique([hackathonId, userId])
+  @@map("team_members")
+}
+
+// kind INVITE: the team asks userId to join. kind REQUEST: userId asks to join.
+model TeamInvite {
+  id          String       @id @default(cuid())
+  teamId      String
+  hackathonId String
+  userId      String // the person who would join
+  kind        InviteKind
+  status      InviteStatus @default(PENDING)
+  createdById String
+
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  @@index([userId, status])
+  @@index([teamId, status])
+  @@map("team_invites")
+}
+
+model Participation {
+  hackathonId    String
+  userId         String
+  lookingForTeam Boolean @default(true)
+
+  hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([hackathonId, userId])
+  @@index([hackathonId, lookingForTeam])
+  @@map("participations")
+}
+
+model PeerFeedback {
+  id          String       @id @default(cuid())
+  hackathonId String
+  teamId      String
+  fromUserId  String
+  toUserId    String
+  skillId     String
+  level       ComfortLevel
+
+  hackathon Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  from      User      @relation("FeedbackGiven", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to        User      @relation("FeedbackReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+  skill     Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([hackathonId, fromUserId, toUserId, skillId])
+  @@index([toUserId])
+  @@map("peer_feedback")
+}
+
+enum TeamRole {
+  LEAD
+  MEMBER
+}
+
+enum InviteKind {
+  INVITE
+  REQUEST
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
 }

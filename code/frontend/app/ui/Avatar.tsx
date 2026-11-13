@@ -42,7 +42,7 @@ export function Avatar({
         ref={ref}
         src={image}
         alt={name}
-        className={`${size} shrink-0 rounded-full border border-border-strong`}
+        className={`${size} shrink-0 rounded-theme-md border border-border-strong object-cover`}
         onError={() => setFailed(true)}
       />
     );
@@ -50,7 +50,7 @@ export function Avatar({
 
   return (
     <div
-      className={`font-display flex ${size} shrink-0 items-center justify-center rounded-full border border-border-strong bg-surface-alt font-semibold text-ink`}
+      className={`flex ${size} shrink-0 items-center justify-center rounded-theme-md border border-border-strong bg-surface-alt font-mono font-medium text-ink`}
     >
       {initials(name)}
     </div>
