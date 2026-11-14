@@ -4,7 +4,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { listOpenReports } from "@/lib/skill-requests";
 import { getUserSkills } from "@/lib/user-skills";
-import { ThemeToggle } from "@/app/ui/ThemeToggle";
 
 import { OnboardingWizard } from "./OnboardingWizard";
 
@@ -38,7 +37,6 @@ export default async function OnboardingPage() {
             <span className="hidden font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ink-muted sm:inline">
               Profile setup
             </span>
-            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -56,8 +54,8 @@ export default async function OnboardingPage() {
   );
 }
 
-// 2x2 cell mark: three evidence cells (ultramarine scale) and one
-// self-reported cell (amber) -- the whole product in four squares.
+// 2x2 cell mark: three evidence cells (green scale) and one
+// self-reported cell (neutral) -- the whole product in four squares.
 function CellMark() {
   return (
     <span aria-hidden="true" className="grid grid-cols-2 gap-[2px]">

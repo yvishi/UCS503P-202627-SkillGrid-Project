@@ -1,7 +1,7 @@
 "use client";
 
 // Cursor-reactive graph paper, after React Bits' "Squares" background:
-// the 24px square under the pointer tints faintly ultramarine and fades
+// the 24px square under the pointer tints faintly and fades
 // out as the pointer moves on. Sits on top of a `.bg-graph` parent, whose
 // ruling starts at the same origin, so the tinted squares line up with
 // the printed grid. Decorative only: aria-hidden, pointer-events-none,

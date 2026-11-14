@@ -7,6 +7,8 @@ export { SKILL_GRID_COLUMNS as GRID_COLUMNS } from "@/lib/skill-grid";
 
 export type DashboardSkillGrid = {
   rows: GridRow[];
+  /** Skills with at least one evidence-backed (non-self) cell. */
+  backedCount: number;
   userSkills: UserSkillEntry[];
   resume: { filename: string; skillCount: number } | null;
   github: { username: string; skillCount: number } | null;
@@ -20,6 +22,7 @@ export async function getSkillGrid(userId: string, activeResumeId: string | null
 
   return {
     rows: grid.rows,
+    backedCount: grid.backedCount,
     userSkills,
     resume: resumeData
       ? {

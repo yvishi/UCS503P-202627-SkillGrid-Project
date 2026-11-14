@@ -25,31 +25,13 @@ export const metadata: Metadata = {
   description: "Trust through evidence, not self-report.",
 };
 
-// Runs before paint to apply a stored theme preference (see
-// app/ui/ThemeToggle.tsx) and avoid a flash of the wrong theme. No
-// preference stored means "system" -- CSS media query handles it.
-const THEME_INIT_SCRIPT = `
-(function () {
-  try {
-    var stored = localStorage.getItem("skillgrid-theme");
-    if (stored === "light" || stored === "dark") {
-      document.documentElement.setAttribute("data-theme", stored);
-    }
-  } catch (e) {}
-})();
-`;
-
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${bricolage.variable} ${schibsted.variable} ${jetbrains.variable} h-full antialiased`}
-      suppressHydrationWarning
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body className="min-h-full flex flex-col">
         {children}
       </body>
     </html>
