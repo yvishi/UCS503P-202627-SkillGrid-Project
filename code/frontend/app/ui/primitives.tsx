@@ -2,8 +2,9 @@
 // (landing) and protected (dashboard/profile/onboarding) surfaces, which
 // is why this lives outside the (protected) route group.
 //
-// Visual language: graph paper + evidence cells. Anything "backed by
-// evidence" is drawn as a filled ultramarine square (the same cell as the
+// Visual language: graph paper + evidence cells. Purple (`accent`) is
+// reserved for the primary action. Anything "backed by
+// evidence" is drawn as a filled forest-green square (the same cell as the
 // EvidenceGrid signature); anything empty/pending is an outlined cell.
 
 export function Eyebrow({
@@ -208,7 +209,7 @@ export const buttonBase =
   "inline-flex items-center justify-center gap-2 rounded-theme-md px-4 py-2.5 text-sm font-semibold transition duration-150 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40 disabled:active:translate-y-0";
 
 export const primaryButtonClass =
-  "bg-trust text-on-trust shadow-[inset_0_-2px_0_rgba(0,0,0,0.18)] hover:bg-trust-strong";
+  "bg-accent text-on-accent shadow-[inset_0_-2px_0_rgba(0,0,0,0.18),0_0_0_1px_rgba(244,236,219,0.35)] hover:bg-accent-strong";
 
 export const secondaryButtonClass =
   "border border-border-strong bg-surface text-ink hover:border-ink hover:bg-surface-alt";

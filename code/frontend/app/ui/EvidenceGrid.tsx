@@ -2,15 +2,15 @@
 
 // The SkillGrid signature: skills as rows, evidence sources as columns,
 // each intersection a contribution-graph cell. Level 0 = nothing on file,
-// 1-4 = increasingly strong evidence. Self-reported cells can be drawn in
-// amber (`selfColumn`) to keep "you said so" visually distinct from
-// "something proves it". Cells fill in a diagonal wave on first view and
+// 1-4 = increasingly strong evidence. Self-reported cells (`selfColumn`)
+// are outlined, never filled, to keep "you said so" visually distinct
+// from "something proves it". Cells fill in a diagonal wave on first view and
 // hovering a cell crosshairs its row and column.
 
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
-import { cellColor, type CellLevel } from "./cell-color";
+import { cellStyle, type CellLevel } from "./cell-color";
 
 export type { CellLevel };
 export type GridRow = { label: string; cells: CellLevel[] };
@@ -61,7 +61,7 @@ export function EvidenceGrid({
                 scope="col"
                 className={`pb-2 text-center align-bottom font-mono text-[10px] font-medium uppercase tracking-[0.12em] transition-colors ${
                   hover?.c === c ? "text-ink" : "text-ink-muted"
-                } ${c === selfColumn ? "text-warm-strong" : ""}`}
+                }`}
               >
                 <span className="px-0.5">{col}</span>
               </th>
@@ -91,12 +91,15 @@ export function EvidenceGrid({
                         className={`${s.cell} block transition-[box-shadow,opacity] duration-150 ${
                           exact ? "ring-2 ring-ink ring-offset-1 ring-offset-surface" : ""
                         } ${hover && !crossed ? "opacity-45" : ""}`}
-                        style={{ backgroundColor: cellColor(level, isSelf) }}
-                        initial={shouldAnimate ? { scale: 0.3, opacity: 0 } : false}
+                        style={cellStyle(level, isSelf)}
+                        // Depends only on the prop, never on the motion preference:
+                        // the server can't know it, and a differing `initial`
+                        // would mismatch on hydration.
+                        initial={animate ? { scale: 0.3, opacity: 0 } : false}
                         whileInView={{ scale: 1, opacity: 1 }}
                         viewport={{ once: true }}
                         transition={{
-                          duration: 0.35,
+                          duration: shouldAnimate ? 0.35 : 0,
                           delay: shouldAnimate ? (r + c) * 0.035 : 0,
                           ease: [0.22, 1, 0.36, 1],
                         }}
@@ -136,7 +139,7 @@ export function EvidenceStrip({
           key={i}
           aria-hidden="true"
           className="h-3 w-3 rounded-[3px]"
-          style={{ backgroundColor: cellColor(level, false) }}
+          style={cellStyle(level, false)}
         />
       ))}
     </div>
@@ -147,13 +150,13 @@ export function GridLegend({ className = "" }: { className?: string }) {
   return (
     <div className={`flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-muted ${className}`}>
       <span className="flex items-center gap-1.5">
-        <span className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: cellColor(3, true) }} />
+        <span className="h-2.5 w-2.5 rounded-[2px]" style={cellStyle(3, true)} />
         Self-reported
       </span>
       <span className="flex items-center gap-1.5">
         Less
         {([0, 1, 2, 3, 4] as CellLevel[]).map((l) => (
-          <span key={l} className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: cellColor(l, false) }} />
+          <span key={l} className="h-2.5 w-2.5 rounded-[2px]" style={cellStyle(l, false)} />
         ))}
         More evidence
       </span>

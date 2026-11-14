@@ -3,7 +3,6 @@ import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { Avatar } from "@/app/ui/Avatar";
 import { SecondaryButton } from "@/app/ui/primitives";
-import { ThemeToggle } from "@/app/ui/ThemeToggle";
 import { countPendingForUser } from "@/lib/teams";
 
 import { NavLinks } from "./NavLinks";
@@ -28,7 +27,7 @@ export async function NavBar() {
   const pendingInvites = user?.id ? await countPendingForUser(user.id) : 0;
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-border bg-nav/95 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
         <div className="flex items-center gap-5">
           <Link
@@ -44,7 +43,6 @@ export async function NavBar() {
 
         {user && (
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
             <Avatar name={displayName} image={user.image ?? null} size="h-8 w-8 text-xs" />
             <form
               action={async () => {

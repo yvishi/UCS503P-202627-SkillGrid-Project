@@ -33,7 +33,7 @@ export default async function ProfileSkillsPage() {
       <header>
         <Link
           href="/profile"
-          className="rounded-theme-sm text-xs font-semibold text-ink-muted underline decoration-border-strong underline-offset-4 hover:text-ink"
+          className="block w-fit rounded-theme-sm text-xs font-semibold text-ink-muted underline decoration-border-strong underline-offset-4 hover:text-ink"
         >
           ← Back to profile
         </Link>
@@ -43,7 +43,10 @@ export default async function ProfileSkillsPage() {
           Add anything you know and rate how comfortable you are. Changes save as you go.
         </p>
       </header>
-      <SkillPicker initial={{ skills, reports }} evidence={evidence} />
+      {/* The picker's controls are drawn for a beige surface, so it sits on a card. */}
+      <div className="rounded-theme-lg border border-border bg-surface p-4 sm:p-6">
+        <SkillPicker initial={{ skills, reports }} evidence={evidence} />
+      </div>
     </main>
   );
 }
