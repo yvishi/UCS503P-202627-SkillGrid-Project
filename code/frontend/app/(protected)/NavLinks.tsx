@@ -31,7 +31,7 @@ export function NavLinks({ className = "", pendingInvites = 0 }: { className?: s
                 href={href}
                 aria-current={active ? "page" : undefined}
                 className={`relative flex items-center gap-2 rounded-theme-sm px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                  active ? "text-ink" : "text-ink-muted hover:bg-surface-alt hover:text-ink"
+                  active ? "text-ink" : "text-ink-muted hover:bg-white/10 hover:text-ink"
                 }`}
               >
                 <span
@@ -42,7 +42,7 @@ export function NavLinks({ className = "", pendingInvites = 0 }: { className?: s
                 />
                 {label}
                 {href === "/invites" && pendingInvites > 0 && (
-                  <span className="rounded-theme-sm bg-trust px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-on-trust">
+                  <span className="rounded-theme-sm bg-accent px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-none text-on-accent">
                     {pendingInvites}
                     <span className="sr-only"> pending</span>
                   </span>

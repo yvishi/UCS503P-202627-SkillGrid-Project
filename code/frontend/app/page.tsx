@@ -3,14 +3,13 @@ import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Eyebrow, GoogleIcon, Pill, PrimaryButton, SecondaryButton } from "@/app/ui/primitives";
-import { ThemeToggle } from "@/app/ui/ThemeToggle";
 import { BlurText, Reveal } from "@/app/ui/motion";
 import { EvidenceGrid, GridLegend, type GridRow } from "@/app/ui/EvidenceGrid";
-import { cellColor, type CellLevel } from "@/app/ui/cell-color";
+import { cellStyle, type CellLevel } from "@/app/ui/cell-color";
 import { GraphBackdrop } from "@/app/landing/GraphBackdrop";
 
 // ── Sample student for the hero grid ──────────────────────────────────
-// Columns are the evidence sources; column 0 (Self) is drawn amber.
+// Columns are the evidence sources; column 0 (Self) is drawn outlined.
 // The top rows have a resume line and repos behind them; the bottom rows
 // are only claims. That contrast is the pitch.
 const COLUMNS = ["Self", "Resume", "GitHub", "Peers"];
@@ -35,7 +34,7 @@ const SOURCES = [
     column: "Self",
     tone: "warm",
     title: "What you say",
-    body: "Your own rating for each skill: just starting, comfortable or confident. It's a fair place to start, so it stays on the grid, but it's drawn in amber so nobody mistakes it for proof.",
+    body: "Your own rating for each skill: just starting, comfortable or confident. It's a fair place to start, so it stays on the grid, but it's drawn as an outline so nobody mistakes it for proof.",
     sample: [1, 2, 3, 4] as CellLevel[],
   },
   {
@@ -100,7 +99,7 @@ function SignInButton({
   );
 }
 
-// 2×2 cell mark: three evidence levels and one amber self-report cell,
+// 2×2 cell mark: three evidence levels and one self-report cell,
 // the whole idea in four squares.
 function Mark() {
   return (
@@ -117,8 +116,7 @@ function SourceCell({ level, tone }: { level: CellLevel; tone: "warm" | "trust" 
   if (tone === "pending") {
     return <span className="block h-5 w-5 rounded-[4px] border border-dashed border-border-strong" />;
   }
-  const backgroundColor = cellColor(level, tone === "warm");
-  return <span className="block h-5 w-5 rounded-[4px]" style={{ backgroundColor }} />;
+  return <span className="block h-5 w-5 rounded-[4px]" style={cellStyle(level, tone === "warm")} />;
 }
 
 export default async function LandingPage({
@@ -146,7 +144,6 @@ export default async function LandingPage({
             <span className="text-[17px] font-bold tracking-tight text-ink">SkillGrid</span>
           </span>
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
             <SignInButton variant="secondary" label="Sign in" />
           </div>
         </div>

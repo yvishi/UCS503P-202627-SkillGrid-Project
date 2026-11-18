@@ -113,6 +113,12 @@ model Profile {
   evidenceScore  Int       @default(0)
   scoreUpdatedAt DateTime?
 
+  // The dashboard's one-time "getting started" guide (lib/guide-core.ts).
+  // guideEndedAt is set once, when the guide is finished or hidden, and
+  // never cleared. guideSeenSteps holds the steps acknowledged from the guide.
+  guideEndedAt   DateTime?
+  guideSeenSteps String[]  @default([])
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())

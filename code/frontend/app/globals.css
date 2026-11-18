@@ -1,43 +1,123 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------
- * SkillGrid theme -- "graph paper": cool ruled-paper surfaces, carbon
- * ink, ultramarine for anything backed by evidence and signal amber for
- * anything only self-reported or still pending. The evidence grid
- * (app/ui/EvidenceGrid.tsx) is the signature; --cell-0..4 is its heat
- * scale. Token names predate the redesign and are kept stable:
- * `trust` = ultramarine (verified), `warm` = amber (self-reported).
+ * SkillGrid theme -- three colours, one look.
+ *   60% forest green: the page ground and the top bar.
+ *   30% beige: the cards and panels that hold content.
+ *   10% electric purple (`accent`): only where we want the user to go.
+ *
+ * Tokens are context-scoped. :root holds the values for content sitting
+ * straight on the green ground; any beige surface redefines the same
+ * tokens for its subtree. So `text-ink`, `border-border`, `text-trust`
+ * etc. are always legible wherever they sit, and pages never need to
+ * know which ground they are on.
+ *
+ * `trust` = backed by evidence (forest green on beige). `warm` =
+ * self-reported, deliberately a neutral. Neither is ever purple.
+ * Contrast is checked by scripts/check-contrast.ts -- keep it in sync.
  * ------------------------------------------------------------------- */
 :root {
-  --bg: #eef0f5;
-  --surface: #fbfbfd;
-  --surface-alt: #e5e8f0;
-  --ink: #12131c;
-  --ink-muted: #5d6175;
-  --border: #dadde7;
-  --border-strong: #c3c7d6;
-  --rule: rgba(18, 19, 28, 0.055);
+  --bg: #1c4531;
+  --nav: #12301f;
+  --surface: #f1e7d3;
+  --surface-alt: #e6dabf;
 
-  --trust: #3b2ef0;
-  --trust-strong: #2a1fc4;
-  --warm: #e89a0c;
-  --warm-strong: #a86d00;
-  --success: #3b2ef0;
-  --success-strong: #2a1fc4;
-  --danger: #d93a2b;
-  --gold: #e89a0c;
-  --gold-strong: #a86d00;
-  --on-trust: #ffffff;
-
-  --cell-0: #e1e4ed;
-  --cell-1: #c9c5fb;
-  --cell-2: #9089f7;
-  --cell-3: #5a4ff3;
-  --cell-4: #3b2ef0;
+  --accent: #7a22ff;
+  --accent-strong: #6312e0;
+  --on-accent: #ffffff;
 
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+}
+
+/* On the green ground. */
+:root,
+.on-ground {
+  --ink: #f4ecdb;
+  --ink-muted: #b7c8b4;
+  --border: #2f5a44;
+  --border-strong: #4a745e;
+  --rule: rgba(244, 236, 219, 0.05);
+
+  --trust: #d6e4c6;
+  --trust-strong: #f4ecdb;
+  --on-trust: #173224;
+  --success: #d6e4c6;
+  --success-strong: #f4ecdb;
+  --warm: #b7c8b4;
+  --warm-strong: #f4ecdb;
+  --gold: #b7c8b4;
+  --gold-strong: #f4ecdb;
+  --danger: #ffa69b;
+
+  --cell-0: #2a5a42;
+  --cell-1: #4f7a5f;
+  --cell-2: #86a587;
+  --cell-3: #bccbab;
+  --cell-4: #f1e7d3;
+}
+
+/* On a beige surface. Matches any element whose own background is a
+ * surface colour (including `bg-surface/90` style variants), plus
+ * elements that turn beige on hover. */
+.on-surface,
+[class^="bg-surface"],
+[class*=" bg-surface"],
+[class*="hover:bg-surface"]:hover {
+  --ink: #173224;
+  --ink-muted: #536458;
+  --border: #d6c8aa;
+  --border-strong: #b9aa88;
+  --rule: rgba(23, 50, 36, 0.06);
+
+  --trust: #1f4d36;
+  --trust-strong: #173a29;
+  --on-trust: #f4ecdb;
+  --success: #1f4d36;
+  --success-strong: #173a29;
+  --warm: #536458;
+  --warm-strong: #173224;
+  --gold: #536458;
+  --gold-strong: #173224;
+  --danger: #b3261e;
+
+  --cell-0: #ddd0b2;
+  --cell-1: #b9c5a3;
+  --cell-2: #869f80;
+  --cell-3: #4f775c;
+  --cell-4: #1f4d36;
+}
+
+/* A green block nested inside a surface goes back to ground values.
+ * Listed after the surface rule so it wins at equal specificity. */
+.on-ground,
+[class^="bg-bg"],
+[class*=" bg-bg"],
+[class^="bg-nav"],
+[class*=" bg-nav"] {
+  --ink: #f4ecdb;
+  --ink-muted: #b7c8b4;
+  --border: #2f5a44;
+  --border-strong: #4a745e;
+  --rule: rgba(244, 236, 219, 0.05);
+
+  --trust: #d6e4c6;
+  --trust-strong: #f4ecdb;
+  --on-trust: #173224;
+  --success: #d6e4c6;
+  --success-strong: #f4ecdb;
+  --warm: #b7c8b4;
+  --warm-strong: #f4ecdb;
+  --gold: #b7c8b4;
+  --gold-strong: #f4ecdb;
+  --danger: #ffa69b;
+
+  --cell-0: #2a5a42;
+  --cell-1: #4f7a5f;
+  --cell-2: #86a587;
+  --cell-3: #bccbab;
+  --cell-4: #f1e7d3;
 }
 
 @theme inline {
@@ -58,6 +138,10 @@
   --color-gold: var(--gold);
   --color-gold-strong: var(--gold-strong);
   --color-on-trust: var(--on-trust);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
+  --color-nav: var(--nav);
   --color-cell-0: var(--cell-0);
   --color-cell-1: var(--cell-1);
   --color-cell-2: var(--cell-2);
@@ -71,62 +155,19 @@
   --radius-theme-lg: var(--radius-lg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0b0c14;
-    --surface: #13141f;
-    --surface-alt: #1b1d2b;
-    --ink: #ecedf4;
-    --ink-muted: #8b8fa6;
-    --border: #252738;
-    --border-strong: #353849;
-    --rule: rgba(236, 237, 244, 0.04);
-
-    --trust: #7c73ff;
-    --trust-strong: #a39dff;
-    --warm: #f5b83d;
-    --warm-strong: #f8c96a;
-    --success: #7c73ff;
-    --success-strong: #a39dff;
-    --danger: #ff6b5c;
-    --gold: #f5b83d;
-    --gold-strong: #f8c96a;
-    --on-trust: #0b0c14;
-
-    --cell-0: #1d1f2e;
-    --cell-1: #2e2a6b;
-    --cell-2: #4840b0;
-    --cell-3: #6359e8;
-    --cell-4: #8c84ff;
+/* Text colour follows the context. In the base layer so that any text
+ * utility on the same element (text-ink-muted, text-danger...) still wins. */
+@layer base {
+  .on-surface,
+  [class^="bg-surface"],
+  [class*=" bg-surface"],
+  .on-ground,
+  [class^="bg-bg"],
+  [class*=" bg-bg"],
+  [class^="bg-nav"],
+  [class*=" bg-nav"] {
+    color: var(--ink);
   }
-}
-
-:root[data-theme="dark"] {
-  --bg: #0b0c14;
-  --surface: #13141f;
-  --surface-alt: #1b1d2b;
-  --ink: #ecedf4;
-  --ink-muted: #8b8fa6;
-  --border: #252738;
-  --border-strong: #353849;
-  --rule: rgba(236, 237, 244, 0.04);
-
-  --trust: #7c73ff;
-  --trust-strong: #a39dff;
-  --warm: #f5b83d;
-  --warm-strong: #f8c96a;
-  --success: #7c73ff;
-  --success-strong: #a39dff;
-  --danger: #ff6b5c;
-  --gold: #f5b83d;
-  --gold-strong: #f8c96a;
-  --on-trust: #0b0c14;
-
-  --cell-0: #1d1f2e;
-  --cell-1: #2e2a6b;
-  --cell-2: #4840b0;
-  --cell-3: #6359e8;
-  --cell-4: #8c84ff;
 }
 
 body {

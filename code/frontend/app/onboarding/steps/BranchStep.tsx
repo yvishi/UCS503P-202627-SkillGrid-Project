@@ -1,5 +1,6 @@
 "use client";
 
+import { cellStyle, type CellLevel } from "@/app/ui/cell-color";
 import { Pill, TrustBadge } from "@/app/ui/primitives";
 import { SpotlightCard } from "@/app/ui/motion";
 
@@ -80,14 +81,7 @@ function ChoiceCard({
               <span
                 key={i}
                 className="h-3 w-3 rounded-[3px]"
-                style={{
-                  backgroundColor:
-                    level === 0
-                      ? "var(--cell-0)"
-                      : cells === "trust"
-                        ? `var(--cell-${level})`
-                        : `color-mix(in srgb, var(--warm) ${30 + level * 17}%, var(--cell-0))`,
-                }}
+                style={cellStyle(level as CellLevel, cells === "warm")}
               />
             ))}
           </span>
