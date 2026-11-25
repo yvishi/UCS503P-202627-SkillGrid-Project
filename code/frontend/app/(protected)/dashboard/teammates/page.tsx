@@ -12,6 +12,7 @@ import { InviteButton } from "../InviteButton";
 import { TeammateCard } from "../MatchCards";
 import { PageHeader } from "../PageHeader";
 import { Filters } from "./Filters";
+import { IdeaMatcher } from "./IdeaMatcher";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Find Teammates",
@@ -58,6 +59,8 @@ export default async function TeammatesPage({
         title="Find teammates"
         description="Students at Thapar who are building a profile, with the evidence each one has on file."
       />
+
+      <IdeaMatcher leadTeams={leadTeams} pendingByUser={Object.fromEntries(pendingByUser)} />
 
       <Filters filters={filters} hackathons={hackathons} />
 

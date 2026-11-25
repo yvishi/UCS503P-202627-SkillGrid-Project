@@ -176,3 +176,47 @@ export async function findOpenTeams(
     hasMore: open.length > start + PAGE_SIZE,
   };
 }
+
+export type IdeaTeammate = TeammateCardData & { matchedSkills: string[] };
+
+const IDEA_MATCH_LIMIT = 12;
+
+// Onboarded users other than the viewer who hold at least one of `slugs`,
+// ranked by how many of them they cover, then by the summed score on those
+// skills. Unlike findTeammates (which needs every skill), this is for an
+// idea's breakdown: no one person is expected to cover a whole project.
+// Cards lead with the matched skills. Loads every match and sorts here,
+// like findTeammates; fine at pilot scale.
+export async function findTeammatesForSkills(
+  viewerId: string,
+  slugs: readonly string[],
+): Promise<IdeaTeammate[]> {
+  if (slugs.length === 0) return [];
+  const rows = await prisma.profile.findMany({
+    where: {
+      onboardingCompletedAt: { not: null },
+      userId: { not: viewerId },
+      user: { skillScores: { some: { skill: { slug: { in: [...slugs] } } } } },
+    },
+    include,
+  });
+  return rows
+    .map((row) => {
+      const matched = row.user.skillScores
+        .filter((s) => slugs.includes(s.skill.slug))
+        .sort((a, b) => b.score - a.score);
+      return { row, matched, total: matched.reduce((sum, s) => sum + s.score, 0) };
+    })
+    .sort(
+      (a, b) =>
+        b.matched.length - a.matched.length ||
+        b.total - a.total ||
+        (a.row.user.name ?? "").localeCompare(b.row.user.name ?? "") ||
+        a.row.userId.localeCompare(b.row.userId),
+    )
+    .slice(0, IDEA_MATCH_LIMIT)
+    .map(({ row, matched }) => {
+      const matchedSkills = matched.map((s) => s.skill.name);
+      return { ...toCard(row), tags: matchedSkills.slice(0, TAG_COUNT + 1), matchedSkills };
+    });
+}
