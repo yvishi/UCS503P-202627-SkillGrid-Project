@@ -7,7 +7,7 @@ import { Eyebrow, Pill, buttonBase, secondaryButtonClass } from "@/app/ui/primit
 import { findSkillNames } from "@/lib/skill-catalog";
 import { getHackathonView } from "@/lib/teams";
 
-import { PHASE_LABEL, formatIst } from "../format";
+import { PHASE_LABEL, formatIst, originLine } from "../format";
 import { TeamPanel } from "./TeamPanel";
 
 export const metadata: Metadata = {
@@ -46,7 +46,18 @@ export default async function HackathonPage({ params }: PageProps<"/hackathons/[
           </p>
           <p className="mt-1 text-sm text-ink-muted">
             Teams of {hackathon.teamSizeMin} to {hackathon.teamSizeMax}
+            {originLine(hackathon) && <> · {originLine(hackathon)}</>}
           </p>
+          {hackathon.url && (
+            <a
+              href={hackathon.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block rounded-theme-sm text-sm font-medium text-trust-strong underline-offset-2 hover:underline"
+            >
+              Official page and registration ↗
+            </a>
+          )}
         </div>
         {phase === "ended" && myTeam && (
           <Link href={`/hackathons/${hackathon.slug}/feedback`} className={`${buttonBase} ${secondaryButtonClass} w-fit`}>

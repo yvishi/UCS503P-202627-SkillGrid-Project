@@ -31,7 +31,7 @@ export default async function TeammatesPage({
   const [{ items, hasMore }, hackathons, leadTeams, pendingRows] = await Promise.all([
     findTeammates(viewerId, filters),
     prisma.hackathon.findMany({
-      where: { endsAt: { gt: new Date() } },
+      where: { endsAt: { gt: new Date() }, visibility: "PUBLISHED" },
       orderBy: { startsAt: "asc" },
       select: { slug: true, name: true },
     }),
