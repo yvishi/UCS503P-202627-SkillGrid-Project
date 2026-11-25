@@ -22,7 +22,8 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "SkillGrid",
-  description: "Trust through evidence, not self-report.",
+  description:
+    "SkillGrid helps Thapar students find hackathon teammates, with skill profiles backed by evidence from resumes, GitHub and peer feedback.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

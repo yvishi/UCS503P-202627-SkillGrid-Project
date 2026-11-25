@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Eyebrow, GoogleIcon, Pill, PrimaryButton, SecondaryButton } from "@/app/ui/primitives";
-import { BlurText, Reveal } from "@/app/ui/motion";
 import { EvidenceGrid, GridLegend, type GridRow } from "@/app/ui/EvidenceGrid";
 import { cellStyle, type CellLevel } from "@/app/ui/cell-color";
 import { GraphBackdrop } from "@/app/landing/GraphBackdrop";
@@ -156,9 +155,9 @@ export default async function LandingPage({
           <GraphBackdrop />
           <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1fr_auto] lg:gap-16 lg:py-24">
             <div className="flex max-w-2xl flex-col items-start gap-6">
-              <Eyebrow>Trust through evidence, not self-report</Eyebrow>
+              <Eyebrow>SkillGrid · hackathon teammate finder for Thapar students</Eyebrow>
               <h1 className="font-display text-[2.5rem] font-extrabold leading-[1.02] tracking-tight text-balance text-ink sm:text-6xl">
-                <BlurText text="Skills you can point to, not just skills you list." />
+                Skills you can point to, not just skills you list.
               </h1>
               <p className="max-w-md text-[15px] leading-relaxed text-ink-muted sm:text-base">
                 SkillGrid builds your profile from your resume and your GitHub,
@@ -202,6 +201,7 @@ export default async function LandingPage({
                 rows={SAMPLE_ROWS}
                 size="lg"
                 selfColumn={0}
+                animate={false}
                 caption="Sample student's skills by evidence source"
               />
               <GridLegend className="mt-5" />
@@ -214,10 +214,48 @@ export default async function LandingPage({
           </div>
         </section>
 
+        {/* Plain statement of what the app is and how it uses Google sign-in */}
+        <section aria-labelledby="about-heading" className="border-b border-border px-4 py-16 sm:px-6 sm:py-20">
+          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-2">
+            <div>
+              <Eyebrow>About</Eyebrow>
+              <h2 id="about-heading" className="mt-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+                What is SkillGrid?
+              </h2>
+              <p className="mt-3 text-[15px] leading-relaxed text-ink-muted">
+                SkillGrid is a free web app, built by students at Thapar Institute
+                of Engineering &amp; Technology, that helps Thapar students find
+                teammates for hackathons. Each student gets a skill profile that
+                shows not just the skills they claim, but which of those skills are
+                backed by evidence: their resume, their GitHub projects, and
+                feedback from past teammates. Students can browse hackathons, look
+                for teammates with the skills a project needs, create teams and send
+                invitations.
+              </p>
+            </div>
+            <div>
+              <Eyebrow>Your Google account</Eyebrow>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+                How SkillGrid uses Google Sign-In
+              </h2>
+              <p className="mt-3 text-[15px] leading-relaxed text-ink-muted">
+                SkillGrid uses Google Sign-In only to confirm you are a Thapar
+                student and to create your account. It receives your name, email
+                address and profile picture, and nothing else: no access to Gmail,
+                Drive, Calendar or contacts. Your Google account data is used only to
+                run SkillGrid. It is never sold, never used for advertising, and never
+                used to train AI models. Details are in our{" "}
+                <Link href="/privacy" className="text-ink underline">Privacy Policy</Link> and{" "}
+                <Link href="/terms" className="text-ink underline">Terms of Service</Link>.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* What each column means */}
         <section aria-labelledby="columns-heading" className="px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto max-w-6xl">
-            <Reveal className="max-w-2xl">
+            <div className="max-w-2xl">
               <Eyebrow>The columns</Eyebrow>
               <h2 id="columns-heading" className="mt-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
                 What counts as evidence
@@ -227,9 +265,9 @@ export default async function LandingPage({
                 source asked to vouch for it, and a cell only fills in when that
                 source has something to show.
               </p>
-            </Reveal>
+            </div>
 
-            <Reveal delay={0.08}>
+            <div>
               <div className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-theme-lg border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
                 {SOURCES.map((src) => (
                   <article key={src.column} className="flex flex-col bg-surface">
@@ -257,24 +295,24 @@ export default async function LandingPage({
                   </article>
                 ))}
               </div>
-            </Reveal>
+            </div>
           </div>
         </section>
 
         {/* How it works */}
         <section aria-labelledby="steps-heading" className="border-t border-border bg-surface px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto max-w-6xl">
-            <Reveal className="max-w-2xl">
+            <div className="max-w-2xl">
               <Eyebrow>How it works</Eyebrow>
               <h2 id="steps-heading" className="mt-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
                 From sign-in to a team in three steps
               </h2>
-            </Reveal>
+            </div>
 
             <ol className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-6">
               {STEPS.map((step, i) => (
                 <li key={step.title}>
-                  <Reveal delay={i * 0.08} className="flex h-full flex-col">
+                  <div className="flex h-full flex-col">
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-xs font-medium text-ink">
                         {i + 1}
@@ -291,7 +329,7 @@ export default async function LandingPage({
                     </div>
                     <h3 className="mt-5 font-semibold text-ink">{step.title}</h3>
                     <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">{step.body}</p>
-                  </Reveal>
+                  </div>
                 </li>
               ))}
             </ol>
