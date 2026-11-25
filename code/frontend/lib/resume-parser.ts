@@ -1,10 +1,32 @@
-import { PDFParse } from "pdf-parse";
+import type { PDFParse as PDFParseType } from "pdf-parse";
 
 import { extractTextViaOcr, OcrError } from "@/lib/ocr";
 import { matchSkillsInText } from "@/lib/resume-matcher";
 import { getCatalog } from "@/lib/skill-catalog";
 
+// pdfjs-dist (under pdf-parse) touches browser globals like DOMMatrix at
+// module load, which Node doesn't provide. pdf-parse/worker polyfills
+// them from @napi-rs/canvas, so it must be imported first. Both are
+// loaded lazily: this module sits in the import graph of every onboarding
+// server action, and a top-level import would crash unrelated actions
+// (e.g. picking a skill category) whenever the polyfill isn't in place.
+let pdfParsePromise: Promise<typeof PDFParseType> | null = null;
+
+function loadPdfParse(): Promise<typeof PDFParseType> {
+  pdfParsePromise ??= (async () => {
+    const { getData } = await import("pdf-parse/worker");
+    const { PDFParse } = await import("pdf-parse");
+    PDFParse.setWorker(getData());
+    return PDFParse;
+  })().catch((err) => {
+    pdfParsePromise = null;
+    throw err;
+  });
+  return pdfParsePromise;
+}
+
 export async function extractPdfText(buffer: Buffer): Promise<string> {
+  const PDFParse = await loadPdfParse();
   const parser = new PDFParse({ data: buffer });
   try {
     const result = await parser.getText();
