@@ -93,8 +93,12 @@ export async function createTeam(
 
   try {
     return await prisma.$transaction(async (tx) => {
-      const hackathon = await tx.hackathon.findUnique({ where: { id: hackathonId }, select: { id: true, endsAt: true } });
-      if (!hackathon) return fail(NO_HACKATHON);
+      const hackathon = await tx.hackathon.findUnique({
+        where: { id: hackathonId },
+        select: { id: true, endsAt: true, visibility: true },
+      });
+      // Pending imports aren't shown to students yet, so nothing can be started in them.
+      if (!hackathon || hackathon.visibility === "PENDING") return fail(NO_HACKATHON);
       const existing = await tx.teamMember.findUnique({
         where: { hackathonId_userId: { hackathonId: hackathon.id, userId } },
         select: { teamId: true },
@@ -165,8 +169,11 @@ export async function setTeamListing(
 }
 
 export async function setLookingForTeam(userId: string, hackathonId: string, looking: boolean): Promise<RuleResult> {
-  const hackathon = await prisma.hackathon.findUnique({ where: { id: hackathonId }, select: { id: true, endsAt: true } });
-  if (!hackathon) return fail(NO_HACKATHON);
+  const hackathon = await prisma.hackathon.findUnique({
+    where: { id: hackathonId },
+    select: { id: true, endsAt: true, visibility: true },
+  });
+  if (!hackathon || hackathon.visibility === "PENDING") return fail(NO_HACKATHON);
   if (isOver(hackathon.endsAt)) return fail(ENDED);
   if (looking) {
     const member = await prisma.teamMember.findUnique({
@@ -282,6 +289,9 @@ const HACKATHON_SELECT = {
   endsAt: true,
   teamSizeMin: true,
   teamSizeMax: true,
+  source: true,
+  url: true,
+  location: true,
 } as const;
 
 export type HackathonSummary = Prisma.HackathonGetPayload<{ select: typeof HACKATHON_SELECT }> & {
@@ -290,7 +300,11 @@ export type HackathonSummary = Prisma.HackathonGetPayload<{ select: typeof HACKA
 
 /** Upcoming and running hackathons first (soonest start first), then ended ones (most recent first). */
 export async function listHackathons(now = new Date()): Promise<HackathonSummary[]> {
-  const rows = await prisma.hackathon.findMany({ select: HACKATHON_SELECT, orderBy: { startsAt: "asc" } });
+  const rows = await prisma.hackathon.findMany({
+    where: { visibility: "PUBLISHED" },
+    select: HACKATHON_SELECT,
+    orderBy: { startsAt: "asc" },
+  });
   const withPhase = rows.map((h) => ({ ...h, phase: hackathonPhase(now, h.startsAt, h.endsAt) }));
   const open = withPhase.filter((h) => h.phase !== "ended");
   const ended = withPhase.filter((h) => h.phase === "ended").sort((a, b) => b.endsAt.getTime() - a.endsAt.getTime());
@@ -329,7 +343,11 @@ export type HackathonView = {
 
 /** Everything the hackathon page needs for this user, or null when the slug is unknown. */
 export async function getHackathonView(userId: string, slug: string): Promise<HackathonView | null> {
-  const hackathon = await prisma.hackathon.findUnique({ where: { slug }, select: HACKATHON_SELECT });
+  // A HIDDEN hackathon stays reachable by link, so teams already in it keep their page.
+  const hackathon = await prisma.hackathon.findFirst({
+    where: { slug, visibility: { not: "PENDING" } },
+    select: HACKATHON_SELECT,
+  });
   if (!hackathon) return null;
 
   const [membership, participation] = await Promise.all([

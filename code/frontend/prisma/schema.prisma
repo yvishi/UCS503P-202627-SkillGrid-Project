@@ -283,9 +283,17 @@ model Hackathon {
   endsAt      DateTime
   teamSizeMin Int      @default(2)
   teamSizeMax Int      @default(4)
-  createdById String
+  createdById String? // null for hackathons imported from a feed
 
-  createdBy      User            @relation("HackathonCreatedBy", fields: [createdById], references: [id])
+  // Imported hackathons (lib/hackathon-feeds.ts) carry their source and the
+  // source's own id, so a re-sync updates them instead of duplicating.
+  source     String? // "devfolio" | "unstop" | "devpost"; null when an admin created it
+  externalId String?
+  url        String?
+  location   String?
+  visibility HackathonVisibility @default(PUBLISHED)
+
+  createdBy      User?           @relation("HackathonCreatedBy", fields: [createdById], references: [id])
   teams          Team[]
   members        TeamMember[]
   invites        TeamInvite[]
@@ -294,7 +302,16 @@ model Hackathon {
 
   createdAt DateTime @default(now())
 
+  @@unique([source, externalId])
   @@map("hackathons")
+}
+
+/// PENDING: imported, waiting for an admin to publish. HIDDEN: an admin
+/// dismissed it, and re-syncs leave it hidden. Only PUBLISHED is listed.
+enum HackathonVisibility {
+  PUBLISHED
+  PENDING
+  HIDDEN
 }
 
 model Team {
