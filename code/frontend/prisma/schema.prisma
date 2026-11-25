@@ -320,6 +320,7 @@ model Team {
   name        String
   description String?
   lookingFor  String[] @default([]) // skill slugs
+  listed      Boolean  @default(false) // shown in "Find a team" while it has an open seat
   createdById String
 
   hackathon Hackathon      @relation(fields: [hackathonId], references: [id], onDelete: Cascade)

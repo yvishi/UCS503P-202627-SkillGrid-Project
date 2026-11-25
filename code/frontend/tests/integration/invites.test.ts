@@ -45,7 +45,7 @@ async function makeHackathon(opts: { teamSizeMax?: number; slug?: string; ended?
 const user = () => createUser({ onboarded: true });
 
 async function teamOf(lead: U, hackathonId: string, name = "Team") {
-  const res = await createTeam(lead.id, hackathonId, { name, lookingFor: [] });
+  const res = await createTeam(lead.id, hackathonId, { name, lookingFor: [], listed: true });
   if (!res.ok) throw new Error(res.error);
   return res.teamId;
 }

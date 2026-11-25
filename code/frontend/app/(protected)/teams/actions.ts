@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { auth } from "@/auth";
-import { createTeam, leaveTeam, setLookingForTeam } from "@/lib/teams";
+import { createTeam, leaveTeam, setLookingForTeam, setTeamListing } from "@/lib/teams";
 
-// Server actions behind TeamPanel. Each one reads the user from auth() and passes
+// Server actions behind the hackathon TeamPanel and the /teams page. Each one reads the user from auth() and passes
 // only that id down; ids in the form name the hackathon or team, never the user.
 
 export type TeamActionState = { ok: boolean; message: string } | null;
@@ -22,8 +22,16 @@ function field(formData: FormData, name: string): string {
   return String(formData.get(name) ?? "");
 }
 
+// A checkbox posts "on" when ticked and nothing when not.
+function checked(formData: FormData, name: string): boolean {
+  return formData.get(name) === "on";
+}
+
 function revalidate(slug: string) {
   revalidatePath("/hackathons");
+  revalidatePath("/teams");
+  revalidatePath("/dashboard/teams");
+  revalidatePath("/dashboard");
   if (slug) revalidatePath(`/hackathons/${slug}`);
 }
 
@@ -35,6 +43,7 @@ export async function createTeamAction(_prev: TeamActionState, formData: FormDat
       name: field(formData, "name"),
       description: field(formData, "description"),
       lookingFor: field(formData, "lookingFor").split(","),
+      listed: checked(formData, "listed"),
     });
     if (!res.ok) return { ok: false, message: res.error };
     revalidate(field(formData, "slug"));
@@ -70,6 +79,25 @@ export async function leaveTeamAction(_prev: TeamActionState, formData: FormData
     return { ok: true, message: "You left the team." };
   } catch (err) {
     console.error("leaveTeamAction failed:", err);
+    return { ok: false, message: GENERIC_ERROR };
+  }
+}
+
+export async function setTeamListingAction(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
+  const userId = await sessionUserId();
+  if (!userId) return SIGNED_OUT;
+  const listed = checked(formData, "listed");
+  try {
+    const res = await setTeamListing(userId, field(formData, "teamId"), {
+      listed,
+      description: field(formData, "description"),
+      lookingFor: field(formData, "lookingFor").split(","),
+    });
+    if (!res.ok) return { ok: false, message: res.error };
+    revalidate(field(formData, "slug"));
+    return { ok: true, message: listed ? "Your team is listed in Find a team." : "Your team is no longer listed." };
+  } catch (err) {
+    console.error("setTeamListingAction failed:", err);
     return { ok: false, message: GENERIC_ERROR };
   }
 }

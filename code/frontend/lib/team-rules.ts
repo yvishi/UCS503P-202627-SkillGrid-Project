@@ -40,16 +40,26 @@ export function canInvite(a: {
   return OK;
 }
 
+/** `listed` is false when the team has not put itself in "Find a team", so it takes no requests. */
 export function canRequest(a: {
   now: Date;
   team: TeamState;
+  listed: boolean;
   alreadyInTeam: boolean;
   pendingExists: boolean;
 }): RuleResult {
   if (hasEnded(a.now, a.team.endsAt)) return fail(ENDED);
+  if (!a.listed) return fail("This team isn't taking join requests.");
   if (a.alreadyInTeam) return fail(ALREADY_IN_TEAM);
   if (a.team.size >= a.team.max) return fail(FULL);
   if (a.pendingExists) return fail("You already have a pending request to this team.");
+  return OK;
+}
+
+/** Listing a team, or changing what it is looking for, is the lead's call and stops when the hackathon ends. */
+export function canEditListing(a: { now: Date; endsAt: Date; actorIsLead: boolean }): RuleResult {
+  if (hasEnded(a.now, a.endsAt)) return fail(ENDED);
+  if (!a.actorIsLead) return fail("Only the team lead can change the listing.");
   return OK;
 }
 

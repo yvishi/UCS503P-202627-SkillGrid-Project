@@ -67,10 +67,7 @@ export default async function HackathonPage({ params }: PageProps<"/hackathons/[
       </header>
 
       <TeamPanel
-        hackathonId={hackathon.id}
-        slug={hackathon.slug}
-        teamSizeMax={hackathon.teamSizeMax}
-        ended={phase === "ended"}
+        hackathon={{ ...hackathon, phase }}
         lookingForTeam={lookingForTeam}
         myTeam={myTeam && { ...myTeam, lookingFor: myTeam.lookingFor.map((s) => skillNames.get(s) ?? s) }}
       />
