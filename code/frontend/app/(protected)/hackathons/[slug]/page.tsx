@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { auth } from "@/auth";
-import { Eyebrow, Pill, buttonBase, secondaryButtonClass } from "@/app/ui/primitives";
+import { Eyebrow, Pill, buttonBase, primaryButtonClass, secondaryButtonClass } from "@/app/ui/primitives";
+import { feedbackWindow } from "@/lib/peer-feedback-core";
 import { findSkillNames } from "@/lib/skill-catalog";
 import { getHackathonView } from "@/lib/teams";
 
@@ -22,6 +23,7 @@ export default async function HackathonPage({ params }: PageProps<"/hackathons/[
   if (!view) notFound();
 
   const { hackathon, myTeam, lookingForTeam, phase } = view;
+  const feedbackOpen = feedbackWindow(hackathon.endsAt, new Date()) === "open";
   const skillNames = myTeam ? await findSkillNames(myTeam.lookingFor) : new Map<string, string>();
 
   return (
@@ -60,9 +62,22 @@ export default async function HackathonPage({ params }: PageProps<"/hackathons/[
           )}
         </div>
         {phase === "ended" && myTeam && (
-          <Link href={`/hackathons/${hackathon.slug}/feedback`} className={`${buttonBase} ${secondaryButtonClass} w-fit`}>
-            Give feedback
-          </Link>
+          <div className="flex flex-wrap items-center gap-3 rounded-theme-lg border border-border bg-surface p-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-ink">Peer feedback</p>
+              <p className="text-xs text-ink-muted">
+                {feedbackOpen
+                  ? "Rate your teammates' skills. It becomes peer evidence on their grid."
+                  : "The feedback window for this hackathon has closed."}
+              </p>
+            </div>
+            <Link
+              href={`/hackathons/${hackathon.slug}/feedback`}
+              className={`${buttonBase} ${feedbackOpen ? primaryButtonClass : secondaryButtonClass} w-fit`}
+            >
+              {feedbackOpen ? "Give feedback →" : "View"}
+            </Link>
+          </div>
         )}
       </header>
 
