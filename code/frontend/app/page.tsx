@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth, signIn } from "@/auth";
@@ -304,9 +305,13 @@ export default async function LandingPage({
       </main>
 
       <footer className="border-t border-border px-4 py-5 sm:px-6">
-        <p className="mx-auto max-w-6xl font-mono text-[11px] text-ink-muted">
-          SkillGrid · built by students at Thapar Institute · sign-in limited to college Google accounts
-        </p>
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 font-mono text-[11px] text-ink-muted sm:flex-row sm:items-center sm:justify-between">
+          <p>SkillGrid · built by students at Thapar Institute · sign-in limited to college Google accounts</p>
+          <nav className="flex gap-4">
+            <Link href="/privacy" className="hover:text-ink">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-ink">Terms of Service</Link>
+          </nav>
+        </div>
       </footer>
     </div>
   );
