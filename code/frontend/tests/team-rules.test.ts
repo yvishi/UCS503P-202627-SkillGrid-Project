@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { canAccept, canCreateTeam, canInvite, canRequest, hackathonPhase, nextLead } from "@/lib/team-rules";
+import {
+  canAccept,
+  canCreateTeam,
+  canEditListing,
+  canInvite,
+  canRequest,
+  hackathonPhase,
+  nextLead,
+} from "@/lib/team-rules";
 
 const now = new Date("2026-11-01T10:00:00Z");
 const future = new Date("2026-12-01T10:00:00Z");
@@ -84,9 +92,18 @@ describe("canInvite", () => {
 });
 
 describe("canRequest", () => {
-  const base = { now, team, alreadyInTeam: false, pendingExists: false };
+  const base = { now, team, listed: true, alreadyInTeam: false, pendingExists: false };
   it("allows a free user", () => {
     expect(canRequest(base)).toEqual({ ok: true });
+  });
+  it("rejects a team that is not listed", () => {
+    expect(canRequest({ ...base, listed: false })).toEqual({
+      ok: false,
+      error: "This team isn't taking join requests.",
+    });
+  });
+  it("reports the end before the listing", () => {
+    expect(canRequest({ ...base, listed: false, team: { ...team, endsAt: past } })).toEqual(ENDED);
   });
   it("rejects after the end", () => {
     expect(canRequest({ ...base, team: { ...team, endsAt: past } })).toEqual(ENDED);
@@ -102,6 +119,21 @@ describe("canRequest", () => {
       ok: false,
       error: "You already have a pending request to this team.",
     });
+  });
+});
+
+describe("canEditListing", () => {
+  it("allows the lead before the end", () => {
+    expect(canEditListing({ now, endsAt: future, actorIsLead: true })).toEqual({ ok: true });
+  });
+  it("rejects a member who is not the lead", () => {
+    expect(canEditListing({ now, endsAt: future, actorIsLead: false })).toEqual({
+      ok: false,
+      error: "Only the team lead can change the listing.",
+    });
+  });
+  it("rejects at or after the end, even for the lead", () => {
+    expect(canEditListing({ now, endsAt: now, actorIsLead: true })).toEqual(ENDED);
   });
 });
 

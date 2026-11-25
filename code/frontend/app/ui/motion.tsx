@@ -20,15 +20,19 @@ export function Reveal({
   className?: string;
 }) {
   const reduce = useReducedMotion();
-  if (reduce) return <div className={className}>{children}</div>;
+  // The server can't know the motion preference, so it always renders the
+  // hidden starting state. Reduced-motion users must get the same element
+  // on the client (a plain <div> here would mismatch on hydration and stay
+  // hidden); they just jump straight to the final state instead.
+  const motionProps = reduce
+    ? { animate: { opacity: 1, y: 0 }, transition: { duration: 0 } }
+    : {
+        whileInView: { opacity: 1, y: 0 },
+        viewport: { once: true, margin: "-40px" },
+        transition: { duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] as const },
+      };
   return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-40px" }}
-      transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
-    >
+    <motion.div className={className} initial={{ opacity: 0, y }} {...motionProps}>
       {children}
     </motion.div>
   );

@@ -18,7 +18,7 @@ const STEP_LABELS: Record<StepKey, string> = {
 };
 
 // Job-application-style horizontal stepper (spec section 3), drawn as a row
-// of grid cells: done = filled ultramarine, current = outlined + pulsing,
+// of grid cells: done = filled green, current = outlined + pulsing,
 // upcoming = empty cell. Steps are passed in because Path A includes a
 // "Resume" step that Path B skips.
 export function Stepper({ steps, current }: { steps: StepKey[]; current: StepKey }) {

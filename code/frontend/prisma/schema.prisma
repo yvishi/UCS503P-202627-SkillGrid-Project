@@ -113,6 +113,12 @@ model Profile {
   evidenceScore  Int       @default(0)
   scoreUpdatedAt DateTime?
 
+  // The dashboard's one-time "getting started" guide (lib/guide-core.ts).
+  // guideEndedAt is set once, when the guide is finished or hidden, and
+  // never cleared. guideSeenSteps holds the steps acknowledged from the guide.
+  guideEndedAt   DateTime?
+  guideSeenSteps String[]  @default([])
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
@@ -277,9 +283,17 @@ model Hackathon {
   endsAt      DateTime
   teamSizeMin Int      @default(2)
   teamSizeMax Int      @default(4)
-  createdById String
+  createdById String? // null for hackathons imported from a feed
 
-  createdBy      User            @relation("HackathonCreatedBy", fields: [createdById], references: [id])
+  // Imported hackathons (lib/hackathon-feeds.ts) carry their source and the
+  // source's own id, so a re-sync updates them instead of duplicating.
+  source     String? // "devfolio" | "unstop" | "devpost"; null when an admin created it
+  externalId String?
+  url        String?
+  location   String?
+  visibility HackathonVisibility @default(PUBLISHED)
+
+  createdBy      User?           @relation("HackathonCreatedBy", fields: [createdById], references: [id])
   teams          Team[]
   members        TeamMember[]
   invites        TeamInvite[]
@@ -288,7 +302,16 @@ model Hackathon {
 
   createdAt DateTime @default(now())
 
+  @@unique([source, externalId])
   @@map("hackathons")
+}
+
+/// PENDING: imported, waiting for an admin to publish. HIDDEN: an admin
+/// dismissed it, and re-syncs leave it hidden. Only PUBLISHED is listed.
+enum HackathonVisibility {
+  PUBLISHED
+  PENDING
+  HIDDEN
 }
 
 model Team {
@@ -297,6 +320,7 @@ model Team {
   name        String
   description String?
   lookingFor  String[] @default([]) // skill slugs
+  listed      Boolean  @default(false) // shown in "Find a team" while it has an open seat
   createdById String
 
   hackathon Hackathon      @relation(fields: [hackathonId], references: [id], onDelete: Cascade)

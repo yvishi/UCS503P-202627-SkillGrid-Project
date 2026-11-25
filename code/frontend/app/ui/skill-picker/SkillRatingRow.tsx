@@ -4,7 +4,7 @@ import { useId, useRef, useState } from "react";
 
 import { SKILL_RATING_LABELS, SKILL_RATING_LEVELS, type SkillRatingLevel } from "@/lib/skills";
 
-// The amber three-cell comfort selector, moved here from the old onboarding
+// The three-cell comfort selector, moved here from the old onboarding
 // SkillsStep. Removing a skill is now its own button, so clicking the
 // chosen level again no longer clears it.
 
