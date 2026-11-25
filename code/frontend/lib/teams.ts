@@ -7,6 +7,7 @@ import {
   canInvite,
   canRequest,
   canCreateTeam,
+  canEditListing,
   hackathonPhase,
   nextLead,
   type HackathonPhase,
@@ -42,7 +43,12 @@ async function lockTeam(tx: Tx, teamId: string) {
   if (rows.length === 0) return null;
   return tx.team.findUnique({
     where: { id: teamId },
-    select: { id: true, hackathonId: true, hackathon: { select: { endsAt: true, teamSizeMax: true } } },
+    select: {
+      id: true,
+      hackathonId: true,
+      listed: true,
+      hackathon: { select: { endsAt: true, teamSizeMax: true } },
+    },
   });
 }
 
@@ -57,19 +63,32 @@ export async function resolveLookingFor(texts: readonly string[]): Promise<strin
   return slugs;
 }
 
+/** Trimmed description, null when blank, or an error when too long. */
+function cleanDescription(text: string | undefined): { ok: true; value: string | null } | { ok: false; error: string } {
+  const value = text?.trim() || null;
+  if (value && value.length > DESCRIPTION_MAX) {
+    return fail(`The description can be at most ${DESCRIPTION_MAX} characters.`);
+  }
+  return { ok: true, value };
+}
+
+/**
+ * Creates a team with the user as its only member and lead. A team of one is fine:
+ * with `listed` it shows in "Find a team" so others can ask to join.
+ */
 export async function createTeam(
   userId: string,
   hackathonId: string,
-  input: { name: string; description?: string; lookingFor: string[] },
+  input: { name: string; description?: string; lookingFor: string[]; listed?: boolean },
 ): Promise<{ ok: true; teamId: string } | { ok: false; error: string }> {
   const name = input.name.trim().replace(/\s+/g, " ");
   if (name.length < NAME_MIN || name.length > NAME_MAX) {
     return fail(`The team name must be ${NAME_MIN} to ${NAME_MAX} characters.`);
   }
-  const description = input.description?.trim() || null;
-  if (description && description.length > DESCRIPTION_MAX) {
-    return fail(`The description can be at most ${DESCRIPTION_MAX} characters.`);
-  }
+  const cleaned = cleanDescription(input.description);
+  if (!cleaned.ok) return cleaned;
+  const description = cleaned.value;
+  const listed = input.listed ?? false;
   const lookingFor = await resolveLookingFor(input.lookingFor);
 
   try {
@@ -89,7 +108,7 @@ export async function createTeam(
       if (clash) return fail("A team with that name already exists in this hackathon.");
 
       const team = await tx.team.create({
-        data: { hackathonId: hackathon.id, name, description, lookingFor, createdById: userId },
+        data: { hackathonId: hackathon.id, name, description, lookingFor, listed, createdById: userId },
         select: { id: true, hackathonId: true },
       });
       // hackathonId comes from the team row just written, never from the caller.
@@ -114,6 +133,35 @@ export async function createTeam(
     }
     throw err;
   }
+}
+
+/**
+ * The lead lists or unlists the team and says what it is looking for. The team row is locked
+ * so a lead hand-over (leaveTeam) cannot happen between the lead check and the write.
+ */
+export async function setTeamListing(
+  userId: string,
+  teamId: string,
+  input: { listed: boolean; description?: string; lookingFor: string[] },
+): Promise<RuleResult> {
+  const cleaned = cleanDescription(input.description);
+  if (!cleaned.ok) return cleaned;
+  const lookingFor = await resolveLookingFor(input.lookingFor);
+  return prisma.$transaction(async (tx) => {
+    const team = await lockTeam(tx, teamId);
+    if (!team) return fail(NO_TEAM);
+    const rule = canEditListing({
+      now: new Date(),
+      endsAt: team.hackathon.endsAt,
+      actorIsLead: await isLead(tx, team.id, userId),
+    });
+    if (!rule.ok) return rule;
+    await tx.team.update({
+      where: { id: team.id },
+      data: { listed: input.listed, description: cleaned.value, lookingFor },
+    });
+    return { ok: true };
+  });
 }
 
 export async function setLookingForTeam(userId: string, hackathonId: string, looking: boolean): Promise<RuleResult> {
@@ -250,6 +298,19 @@ export async function listHackathons(now = new Date()): Promise<HackathonSummary
 }
 
 export type TeamMemberView = { userId: string; name: string; image: string | null; role: "LEAD" | "MEMBER" };
+
+const MEMBER_SELECT = {
+  orderBy: { joinedAt: "asc" },
+  select: { userId: true, role: true, user: { select: { name: true, image: true } } },
+} as const satisfies Prisma.Team$membersArgs;
+
+function toMemberView(m: {
+  userId: string;
+  role: "LEAD" | "MEMBER";
+  user: { name: string | null; image: string | null };
+}): TeamMemberView {
+  return { userId: m.userId, name: m.user.name ?? "SkillGrid member", image: m.user.image, role: m.role };
+}
 export type HackathonView = {
   hackathon: Prisma.HackathonGetPayload<{ select: typeof HACKATHON_SELECT }>;
   myTeam: {
@@ -258,7 +319,9 @@ export type HackathonView = {
     role: "LEAD" | "MEMBER";
     description: string | null;
     lookingFor: string[];
+    listed: boolean;
     members: TeamMemberView[];
+    pendingRequests: number; // join requests waiting on the lead; 0 for members
   } | null;
   lookingForTeam: boolean;
   phase: HackathonPhase;
@@ -280,10 +343,9 @@ export async function getHackathonView(userId: string, slug: string): Promise<Ha
             name: true,
             description: true,
             lookingFor: true,
-            members: {
-              orderBy: { joinedAt: "asc" },
-              select: { userId: true, role: true, user: { select: { name: true, image: true } } },
-            },
+            listed: true,
+            members: MEMBER_SELECT,
+            _count: { select: { invites: { where: { kind: "REQUEST", status: "PENDING" } } } },
           },
         },
       },
@@ -301,12 +363,9 @@ export async function getHackathonView(userId: string, slug: string): Promise<Ha
         role: membership.role,
         description: membership.team.description,
         lookingFor: membership.team.lookingFor,
-        members: membership.team.members.map((m) => ({
-          userId: m.userId,
-          name: m.user.name ?? "SkillGrid member",
-          image: m.user.image,
-          role: m.role,
-        })),
+        listed: membership.team.listed,
+        members: membership.team.members.map(toMemberView),
+        pendingRequests: membership.role === "LEAD" ? membership.team._count.invites : 0,
       }
     : null;
 
@@ -407,6 +466,7 @@ export async function requestToJoin(userId: string, teamId: string): Promise<Rul
     const rule = canRequest({
       now: new Date(),
       team: { size, max: team.hackathon.teamSizeMax, endsAt: team.hackathon.endsAt },
+      listed: team.listed,
       alreadyInTeam: ownRow !== null,
       pendingExists,
     });
@@ -615,4 +675,74 @@ export async function listInvitesForUser(
     toMyTeams: toMyTeams.map((i) => toListRow(i, i.user.name)),
     sent: sent.map((i) => toListRow(i, i.kind === "INVITE" ? i.user.name : i.team.members[0]?.user.name)),
   };
+}
+
+export type MyTeamRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  lookingFor: string[]; // skill slugs
+  listed: boolean;
+  role: "LEAD" | "MEMBER";
+  members: TeamMemberView[];
+  pendingRequests: number; // join requests waiting on the lead
+  hackathon: { id: string; slug: string; name: string; teamSizeMax: number; phase: HackathonPhase };
+};
+
+/**
+ * Every team this user is in, one per hackathon: teams of open hackathons first
+ * (soonest end first), then ended ones (most recent first).
+ */
+export async function listMyTeams(userId: string, now = new Date()): Promise<MyTeamRow[]> {
+  const rows = await prisma.teamMember.findMany({
+    where: { userId },
+    select: {
+      role: true,
+      hackathon: { select: { id: true, slug: true, name: true, startsAt: true, endsAt: true, teamSizeMax: true } },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          lookingFor: true,
+          listed: true,
+          members: MEMBER_SELECT,
+          _count: { select: { invites: { where: { kind: "REQUEST", status: "PENDING" } } } },
+        },
+      },
+    },
+  });
+
+  const mapped = rows.map((r) => ({
+    endsAt: r.hackathon.endsAt,
+    row: {
+      id: r.team.id,
+      name: r.team.name,
+      description: r.team.description,
+      lookingFor: r.team.lookingFor,
+      listed: r.team.listed,
+      role: r.role,
+      members: r.team.members.map(toMemberView),
+      pendingRequests: r.role === "LEAD" ? r.team._count.invites : 0,
+      hackathon: {
+        id: r.hackathon.id,
+        slug: r.hackathon.slug,
+        name: r.hackathon.name,
+        teamSizeMax: r.hackathon.teamSizeMax,
+        phase: hackathonPhase(now, r.hackathon.startsAt, r.hackathon.endsAt),
+      },
+    } satisfies MyTeamRow,
+  }));
+  const open = mapped.filter((m) => m.row.hackathon.phase !== "ended").sort((a, b) => +a.endsAt - +b.endsAt);
+  const ended = mapped.filter((m) => m.row.hackathon.phase === "ended").sort((a, b) => +b.endsAt - +a.endsAt);
+  return [...open, ...ended].map((m) => m.row);
+}
+
+/** Hackathons that have not ended where this user has no team yet, so they can start one. */
+export async function hackathonsWithoutTeam(userId: string): Promise<{ id: string; slug: string; name: string }[]> {
+  return prisma.hackathon.findMany({
+    where: { endsAt: { gt: new Date() }, members: { none: { userId } } },
+    orderBy: { startsAt: "asc" },
+    select: { id: true, slug: true, name: true },
+  });
 }

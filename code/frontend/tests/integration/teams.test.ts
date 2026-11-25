@@ -1,7 +1,17 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { prisma } from "@/lib/prisma";
-import { acceptInTransaction, createTeam, getHackathonView, leaveTeam, setLookingForTeam } from "@/lib/teams";
+import {
+  acceptInTransaction,
+  createTeam,
+  getHackathonView,
+  hackathonsWithoutTeam,
+  leaveTeam,
+  listMyTeams,
+  requestToJoin,
+  setLookingForTeam,
+  setTeamListing,
+} from "@/lib/teams";
 import { createUser, resetDb } from "./helpers";
 
 beforeEach(async () => {
@@ -116,6 +126,116 @@ describe("createTeam", () => {
     await teamOf((await createUser()).id, h.id, "Alpha");
     const res = await createTeam((await createUser()).id, h.id, { name: "alpha", lookingFor: [] });
     expect(res.ok).toBe(false);
+  });
+});
+
+describe("team listing", () => {
+  it("starts unlisted unless asked, and a team of one can be listed at creation", async () => {
+    const h = await makeHackathon();
+    const quiet = await createUser();
+    const solo = await createUser();
+    await teamOf(quiet.id, h.id, "Quiet");
+    const res = await createTeam(solo.id, h.id, { name: "Solo", lookingFor: ["React"], listed: true });
+    expect(res.ok).toBe(true);
+
+    const teams = await prisma.team.findMany({ orderBy: { name: "asc" }, select: { name: true, listed: true } });
+    expect(teams).toEqual([
+      { name: "Quiet", listed: false },
+      { name: "Solo", listed: true },
+    ]);
+  });
+
+  it("lets the lead list the team and update what it needs", async () => {
+    const h = await makeHackathon();
+    const lead = await createUser();
+    const teamId = await teamOf(lead.id, h.id);
+
+    const res = await setTeamListing(lead.id, teamId, {
+      listed: true,
+      description: "  An app for study groups ",
+      lookingFor: ["Python", "nope-not-a-skill"],
+    });
+    expect(res).toEqual({ ok: true });
+    const team = await prisma.team.findUniqueOrThrow({ where: { id: teamId } });
+    expect(team).toMatchObject({ listed: true, description: "An app for study groups", lookingFor: ["python"] });
+
+    expect(await setTeamListing(lead.id, teamId, { listed: false, lookingFor: [] })).toEqual({ ok: true });
+    expect((await prisma.team.findUniqueOrThrow({ where: { id: teamId } })).listed).toBe(false);
+  });
+
+  it("refuses a member who is not the lead", async () => {
+    const h = await makeHackathon();
+    const lead = await createUser();
+    const member = await createUser();
+    const teamId = await teamOf(lead.id, h.id);
+    await addMember(teamId, h.id, member.id, lead.id);
+
+    expect(await setTeamListing(member.id, teamId, { listed: true, lookingFor: [] })).toEqual({
+      ok: false,
+      error: "Only the team lead can change the listing.",
+    });
+    expect((await prisma.team.findUniqueOrThrow({ where: { id: teamId } })).listed).toBe(false);
+  });
+
+  it("refuses join requests to an unlisted team", async () => {
+    const h = await makeHackathon();
+    const lead = await createUser();
+    const joiner = await createUser({ onboarded: true });
+    const teamId = await teamOf(lead.id, h.id);
+
+    expect(await requestToJoin(joiner.id, teamId)).toEqual({
+      ok: false,
+      error: "This team isn't taking join requests.",
+    });
+    await setTeamListing(lead.id, teamId, { listed: true, lookingFor: [] });
+    expect(await requestToJoin(joiner.id, teamId)).toEqual({ ok: true });
+  });
+});
+
+describe("listMyTeams", () => {
+  it("lists every team the user is in with their teammates, open hackathons first", async () => {
+    const now = Date.now();
+    const admin = await createUser();
+    const mk = (slug: string, endsIn: number) =>
+      prisma.hackathon.create({
+        data: {
+          slug,
+          name: slug,
+          startsAt: new Date(now - 10 * DAY),
+          endsAt: new Date(now + endsIn * DAY),
+          createdById: admin.id,
+        },
+      });
+    const later = await mk("later", 5);
+    const sooner = await mk("sooner", 2);
+    const past = await mk("past", 5);
+
+    const me = await createUser();
+    const mate = await createUser();
+    const requester = await createUser({ onboarded: true });
+    const laterTeam = await teamOf(me.id, later.id, "Later team");
+    await addMember(laterTeam, later.id, mate.id, me.id);
+    const soonerTeam = await createTeam(mate.id, sooner.id, { name: "Mate's team", lookingFor: [], listed: true });
+    if (!soonerTeam.ok) throw new Error(soonerTeam.error);
+    await addMember(soonerTeam.teamId, sooner.id, me.id, mate.id);
+    await requestToJoin(requester.id, soonerTeam.teamId);
+    await teamOf(me.id, past.id, "Old team");
+    await prisma.hackathon.update({ where: { id: past.id }, data: { endsAt: new Date(now - DAY) } });
+    await mk("free", 3);
+
+    const teams = await listMyTeams(me.id);
+    expect(teams.map((t) => [t.name, t.role, t.hackathon.phase])).toEqual([
+      ["Mate's team", "MEMBER", "running"],
+      ["Later team", "LEAD", "running"],
+      ["Old team", "LEAD", "ended"],
+    ]);
+    expect(teams[0].members.map((m) => m.userId)).toEqual([mate.id, me.id]);
+    expect(teams[0].listed).toBe(true);
+    // Join requests are the lead's business; a member sees none.
+    expect(teams[0].pendingRequests).toBe(0);
+    expect((await listMyTeams(mate.id)).find((t) => t.name === "Mate's team")?.pendingRequests).toBe(1);
+
+    expect((await hackathonsWithoutTeam(me.id)).map((h) => h.slug)).toEqual(["free"]);
   });
 });
 

@@ -124,7 +124,7 @@ export type TeamCardData = {
   openSlots: number;
 };
 
-// Teams of unended hackathons that still have a seat, newest first, never
+// Listed teams of unended hackathons that still have a seat, newest first, never
 // including a team the viewer belongs to. The seat check compares the member
 // count with the hackathon's teamSizeMax, which Prisma cannot filter on, so
 // candidates are loaded and filtered here before paging. Fine at pilot scale.
@@ -137,6 +137,7 @@ export async function findOpenTeams(
   const rows = await prisma.team.findMany({
     where: {
       hackathon: { endsAt: { gt: new Date() }, ...(f.hackathon ? { slug: f.hackathon } : {}) },
+      listed: true,
       members: { none: { userId: viewerId } },
       ...(f.skill ? { lookingFor: { has: f.skill } } : {}),
     },

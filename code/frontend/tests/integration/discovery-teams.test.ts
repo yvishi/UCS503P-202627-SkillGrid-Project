@@ -32,9 +32,10 @@ async function team(
   name: string,
   memberIds: string[],
   lookingFor: string[] = [],
+  listed = true,
 ) {
   const t = await prisma.team.create({
-    data: { hackathonId: h.id, name, lookingFor, createdById: memberIds[0] },
+    data: { hackathonId: h.id, name, lookingFor, listed, createdById: memberIds[0] },
   });
   for (const [i, userId] of memberIds.entries()) {
     await prisma.teamMember.create({
@@ -45,6 +46,17 @@ async function team(
 }
 
 describe("findOpenTeams", () => {
+  it("does not list a team that has not been listed", async () => {
+    const viewer = await createUser();
+    const h = await hackathon("unlisted");
+    const [a, b] = [await createUser(), await createUser()];
+    await team(h, "Hidden", [a.id], [], false);
+    await team(h, "Solo and listed", [b.id]);
+
+    const { items } = await findOpenTeams(viewer.id, none);
+    expect(items.map((t) => t.name)).toEqual(["Solo and listed"]);
+  });
+
   it("does not list a full team", async () => {
     const viewer = await createUser();
     const h = await hackathon("full", { max: 2 });
