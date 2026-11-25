@@ -94,7 +94,7 @@ describe("parseUnstop", () => {
 });
 
 describe("parseDevpostDates", () => {
-  const ist = (d: Date) => d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hour12: false });
+  const ist = (d: Date) => d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", hourCycle: "h23" });
 
   it("reads a range across months", () => {
     const r = parseDevpostDates("Oct 30 - Dec 04, 2026")!;
