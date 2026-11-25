@@ -5,13 +5,14 @@ import { Reveal } from "@/app/ui/motion";
 import { Empty, Eyebrow, Pill } from "@/app/ui/primitives";
 import { listHackathons, type HackathonSummary } from "@/lib/teams";
 
-import { PHASE_LABEL, formatIst } from "./format";
+import { PHASE_LABEL, formatIst, originLine } from "./format";
 
 export const metadata: Metadata = {
   title: "SkillGrid – Hackathons",
 };
 
 function HackathonRow({ hackathon }: { hackathon: HackathonSummary }) {
+  const origin = originLine(hackathon);
   return (
     <Link
       href={`/hackathons/${hackathon.slug}`}
@@ -28,6 +29,7 @@ function HackathonRow({ hackathon }: { hackathon: HackathonSummary }) {
       </p>
       <p className="text-sm text-ink-muted">
         Teams of {hackathon.teamSizeMin} to {hackathon.teamSizeMax}
+        {origin && <span className="text-ink-muted"> · {origin}</span>}
       </p>
     </Link>
   );

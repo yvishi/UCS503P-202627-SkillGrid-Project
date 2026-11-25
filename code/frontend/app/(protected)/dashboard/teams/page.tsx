@@ -30,7 +30,7 @@ export default async function TeamsPage({
   const [{ items, hasMore }, hackathons, viewerState] = await Promise.all([
     findOpenTeams(viewerId, filters),
     prisma.hackathon.findMany({
-      where: { endsAt: { gt: new Date() } },
+      where: { endsAt: { gt: new Date() }, visibility: "PUBLISHED" },
       orderBy: { startsAt: "asc" },
       select: { slug: true, name: true },
     }),
