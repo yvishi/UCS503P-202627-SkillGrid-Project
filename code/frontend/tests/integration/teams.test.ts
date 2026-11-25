@@ -222,6 +222,8 @@ describe("listMyTeams", () => {
     await teamOf(me.id, past.id, "Old team");
     await prisma.hackathon.update({ where: { id: past.id }, data: { endsAt: new Date(now - DAY) } });
     await mk("free", 3);
+    const pending = await mk("pending-import", 3);
+    await prisma.hackathon.update({ where: { id: pending.id }, data: { visibility: "PENDING" } });
 
     const teams = await listMyTeams(me.id);
     expect(teams.map((t) => [t.name, t.role, t.hackathon.phase])).toEqual([

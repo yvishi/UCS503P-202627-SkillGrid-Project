@@ -756,10 +756,13 @@ export async function listMyTeams(userId: string, now = new Date()): Promise<MyT
   return [...open, ...ended].map((m) => m.row);
 }
 
-/** Hackathons that have not ended where this user has no team yet, so they can start one. */
+/**
+ * Published hackathons that have not ended where this user has no team yet, so they can start one.
+ * Pending imports refuse new teams, and hidden ones are off the hackathon list, so neither is offered.
+ */
 export async function hackathonsWithoutTeam(userId: string): Promise<{ id: string; slug: string; name: string }[]> {
   return prisma.hackathon.findMany({
-    where: { endsAt: { gt: new Date() }, members: { none: { userId } } },
+    where: { visibility: "PUBLISHED", endsAt: { gt: new Date() }, members: { none: { userId } } },
     orderBy: { startsAt: "asc" },
     select: { id: true, slug: true, name: true },
   });
