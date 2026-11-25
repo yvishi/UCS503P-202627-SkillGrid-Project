@@ -71,6 +71,7 @@ export async function submitFeedbackAction(
   await recomputeUserScoresSafely(input.toUserId);
 
   revalidatePath("/dashboard");
+  revalidatePath(`/hackathons/${hackathonSlug}`);
   revalidatePath(`/hackathons/${hackathonSlug}/feedback`);
   return { ok: true };
 }
