@@ -26,9 +26,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async signIn({ user }) {
       if (!ALLOWED_EMAIL_DOMAIN) return true; // not configured, allow all (dev)
-      return Boolean(user.email?.endsWith(`@${ALLOWED_EMAIL_DOMAIN}`));
+      return Boolean(
+        user.email?.toLowerCase().endsWith(`@${ALLOWED_EMAIL_DOMAIN.toLowerCase()}`),
+      );
     },
   },
+  // Send auth errors (e.g. AccessDenied for a non-college account) back to
+  // the landing page, which renders a friendly message for ?error=AccessDenied.
+  pages: { error: "/" },
   // Vercel preview deployments get a new URL per deploy; without this,
   // Auth.js rejects the request host as untrusted.
   trustHost: true,

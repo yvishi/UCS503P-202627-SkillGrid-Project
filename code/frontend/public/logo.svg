@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>SkillGrid</title>
+  <rect width="512" height="512" fill="#1c4531"/>
+  <rect x="86"  y="86"  width="150" height="150" rx="28" fill="#f1e7d3"/>
+  <rect x="276" y="86"  width="150" height="150" rx="28" fill="#86a587"/>
+  <rect x="86"  y="276" width="150" height="150" rx="28" fill="#b7c8b4"/>
+  <rect x="276" y="276" width="150" height="150" rx="28" fill="#bccbab"/>
+</svg>
